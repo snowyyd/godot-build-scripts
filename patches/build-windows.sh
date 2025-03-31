@@ -5,7 +5,7 @@ set -e
 # Config
 
 export SCONS="scons -j${NUM_CORES} verbose=no warnings=no progress=no"
-export OPTIONS="production=yes use_mingw=yes angle_libs=/root/angle mesa_libs=/root/mesa d3d12=yes accesskit_sdk_path=/root/accesskit/accesskit-c"
+export OPTIONS="production=yes use_quickjs_ng=yes use_mingw=yes angle_libs=/root/angle mesa_libs=/root/mesa d3d12=yes accesskit_sdk_path=/root/accesskit/accesskit-c"
 export OPTIONS_MONO="module_mono_enabled=yes"
 export OPTIONS_LLVM="use_llvm=yes mingw_prefix=/root/llvm-mingw"
 export TERM=xterm
@@ -14,6 +14,15 @@ rm -rf godot
 mkdir godot
 cd godot
 tar xf /root/godot.tar.gz --strip-components=1
+
+# GodotJS: fix for MinGW
+sed -i -e 's/winmm.lib/-lwinmm/' -e 's/Dbghelp.lib/-ldbghelp/' modules/GodotJS/SCsub
+
+# TODO: lws on MinGW
+sed -i -E 's/lws_support = .+$/lws_support = None/' modules/GodotJS/SCsub
+
+# TODO: v8 on MinGW
+# sed -i -e 's/v8_monolith.lib/libv8_monolith.a/' modules/GodotJS/SCsub
 
 # Classical
 

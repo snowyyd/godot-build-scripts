@@ -51,7 +51,7 @@ while getopts "h?t:v:j:d:g:b:z:fsc" opt; do
     echo "  -d godotjs deps ref (e.g. v8_12.4.254.21_r13) [mandatory]"
     echo "  -g git treeish (e.g. master)"
     echo "  -b all|classical|mono (default: all)"
-    echo "  -z (enables debug mode)"
+    echo "  -z debug mode (true, false) (default: false)"
     echo
     exit 1
     ;;
@@ -78,7 +78,9 @@ while getopts "h?t:v:j:d:g:b:z:fsc" opt; do
     fi
     ;;
   z)
-    debug_mode=1
+    if [ "$OPTARG" == "true" ]; then
+      debug_mode=1
+    fi
     ;;
   esac
 done
@@ -277,12 +279,13 @@ else
   echo "${TARBALL_GZIP_NAME} already exists, skipping downloads..."
 fi
 
-export podman_run="${podman} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} -v ${basedir}/${TARBALL_GZIP_NAME}:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
+export podman_run="${podman} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} --env SCRIPT_AES256_ENCRYPTION_KEY=${SCRIPT_AES256_ENCRYPTION_KEY} -v ${basedir}/${TARBALL_GZIP_NAME}:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
 export img_version=$IMAGE_VERSION
 
 run_command="bash build/build.sh"
 if [[ "$debug_mode" -eq 1 ]]; then
   run_command="sleep infinity"
+  echo "WARN: You are running in debug mode, no build will be performed"
 fi
 
 case "$target_os" in

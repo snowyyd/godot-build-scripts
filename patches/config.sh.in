@@ -104,3 +104,8 @@ export GODOT_ANDROID_SIGN_KEYSTORE=''
 export GODOT_ANDROID_KEYSTORE_ALIAS=''
 # Password for the key used for signing the release build
 export GODOT_ANDROID_SIGN_PASSWORD=''
+
+# https://docs.godotengine.org/en/stable/contributing/development/compiling/compiling_with_script_encryption_key.html
+if [ -z "$SCRIPT_AES256_ENCRYPTION_KEY" ]; then
+	export SCRIPT_AES256_ENCRYPTION_KEY='0000000000000000000000000000000000000000000000000000000000000000'
+fi
