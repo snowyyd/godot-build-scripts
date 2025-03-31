@@ -197,7 +197,7 @@ fi
 
 # Clone Godot, GodotJS and GodotJS deps
 TARBALL_TEMPLATE_NAME="godot-${godot_version}"
-TARBALL_GZIP_NAME="${TARBALL_TEMPLATE_NAME}.gz"
+TARBALL_GZIP_NAME="${TARBALL_TEMPLATE_NAME}.tar.gz"
 if [ ! -f ${TARBALL_GZIP_NAME} ]; then
   git clone https://github.com/godotengine/godot git || /bin/true
   pushd git
@@ -260,8 +260,7 @@ if [ ! -f ${TARBALL_GZIP_NAME} ]; then
   echo $HEAD > $TARBALL_TEMPLATE_NAME/.git/HEAD
   tar -uf $TARBALL_TEMPLATE_NAME.tar $TARBALL_TEMPLATE_NAME
   popd
-  gzip -c $TMPDIR/$TARBALL_TEMPLATE_NAME.tar > ../$TARBALL_TEMPLATE_NAME.tar.gz
-  ls $TMPDIR
+  gzip -c $TMPDIR/$TARBALL_TEMPLATE_NAME.tar > ../$TARBALL_GZIP_NAME
   rm -rf $TMPDIR
 
   popd
