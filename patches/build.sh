@@ -196,13 +196,15 @@ if [ ! -d "deps/keystore" ]; then
 fi
 
 # Clone Godot, GodotJS and GodotJS deps
-if [ ! -f godot-${godot_version}.tar.gz ]; then
+TARBALL_TEMPLATE_NAME="godot-${godot_version}"
+TARBALL_GZIP_NAME="${TARBALL_TEMPLATE_NAME}.gz"
+if [ ! -f ${TARBALL_GZIP_NAME} ]; then
   git clone https://github.com/godotengine/godot git || /bin/true
   pushd git
-  git checkout -b ${git_treeish} origin/${git_treeish} || git checkout ${git_treeish}
-  git reset --hard
-  git clean -fdx
-  git pull origin ${git_treeish} || /bin/true
+  # git checkout -b ${git_treeish} origin/${git_treeish} || git checkout ${git_treeish}
+  # git reset --hard
+  # git clean -fdx
+  # git pull origin ${git_treeish} || /bin/true
 
   # I'm not gonna make python3 a local dependency just for this simple check lol
   # Validate version
@@ -221,20 +223,53 @@ if [ ! -f godot-${godot_version}.tar.gz ]; then
   # fi
 
   # Download GodotJS
-  git clone --depth 1 --recursive --branch ${godotjs_ref} https://github.com/godotjs/godotjs modules/GodotJS
+  GODOTJS_MOD_DIR="modules/GodotJS"
+  if [ ! -d ${GODOTJS_MOD_DIR} ]; then
+    git clone --depth 1 --recursive --branch ${godotjs_ref} https://github.com/godotjs/godotjs ${GODOTJS_MOD_DIR}
+  fi
 
   # Download GodotJS deps
-  curl -L https://github.com/ialex32x/GodotJS-Dependencies/releases/download/${godotjs_deps_ref}/${godotjs_deps_ref}.zip --output v8.zip
-  7z x -ogodot/modules/GodotJS v8.zip
-  rm v8.zip
+  if [ ! -d ${GODOTJS_MOD_DIR}/v8 ]; then
+    if [ ! -f v8.zip ]; then
+      echo "Downloading v8 dependency..."
+      curl -L https://github.com/ialex32x/GodotJS-Dependencies/releases/download/${godotjs_deps_ref}/${godotjs_deps_ref}.zip --output ./v8.zip
+    fi
 
-  sh misc/scripts/make_tarball.sh -v ${godot_version} -g ${git_treeish}
+    echo "Extracting v8..."
+    7z x -o${GODOTJS_MOD_DIR} ./v8.zip
+    rm ./v8.zip || /bin/true
+  fi
+
+  # add GodotJS
+  rm -rf ${GODOTJS_MOD_DIR}/.git
+  
+  # make tarball
+  HEAD=$(git rev-parse $git_treeish)
+  TMPDIR=$(mktemp -d -t godot-XXXXXX)
+
+  echo "Generating tarball for revision $HEAD with folder name '$TARBALL_TEMPLATE_NAME'."
+  echo
+  echo "The tarball will be written to the parent folder:"
+  echo "    $(pwd)/$TARBALL_GZIP_NAME"
+
+  tar --exclude='.git' --exclude 'v8.zip' -cf $TMPDIR/$TARBALL_TEMPLATE_NAME.tar --transform "s,^,$TARBALL_TEMPLATE_NAME/," -C . $(ls -A)
+
+  # Adding custom .git/HEAD to tarball so that we can generate GODOT_VERSION_HASH.
+  pushd $TMPDIR
+  mkdir -p $TARBALL_TEMPLATE_NAME/.git
+  echo $HEAD > $TARBALL_TEMPLATE_NAME/.git/HEAD
+  tar -uf $TARBALL_TEMPLATE_NAME.tar $TARBALL_TEMPLATE_NAME
+  popd
+  gzip -c $TMPDIR/$TARBALL_TEMPLATE_NAME.tar > ../$TARBALL_TEMPLATE_NAME.tar.gz
+  ls $TMPDIR
+  rm -rf $TMPDIR
+
   popd
 else
-  echo "godot-${godot_version}.tar.gz already exists, skipping downloads..."
+  echo "${TARBALL_GZIP_NAME} already exists, skipping downloads..."
 fi
 
-export podman_run="${podman} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} -v ${basedir}/godot-${godot_version}.tar.gz:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
+export podman_run="${podman} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} -v ${basedir}/${TARBALL_GZIP_NAME}:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
 export img_version=$IMAGE_VERSION
 
 case "$target_os" in

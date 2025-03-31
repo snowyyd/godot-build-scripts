@@ -17,6 +17,6 @@ bash ${G_UTILS_DIR}/patch.sh apply
 # bash ${G_GODOT_SCRIPTS_DIR}/build.sh -v ${G_GODOT_REF} -g ${G_GODOT_REF} -j ${G_GODOTJS_REF} -d ${G_GODOTJS_DEPS_REF} -t mono-glue
 bash ${G_GODOT_SCRIPTS_DIR}/build.sh -v ${G_GODOT_REF} -g ${G_GODOT_REF} -j ${G_GODOTJS_REF} -d ${G_GODOTJS_DEPS_REF} -t windows
 
-bash ${G_UTILS_DIR}/patch.sh restore
+# bash ${G_UTILS_DIR}/patch.sh restore
 
 echo "All done! :-)"

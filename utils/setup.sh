@@ -10,4 +10,4 @@ check_commands() {
 	return 0
 }
 
-check_commands git curl docker 7z tar unzip
+check_commands git curl docker 7z tar unzip gzip

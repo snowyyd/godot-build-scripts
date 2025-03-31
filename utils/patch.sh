@@ -15,7 +15,7 @@ backup_and_patch() {
     local patch_file="$2"
 
     if [ ! -f "${file_path}.bak" ]; then
-        echo "Creating backup of ${file_path}..."
+        # echo "Creating backup of ${file_path}..."
         cp "${file_path}" "${file_path}.bak"
     fi
 
