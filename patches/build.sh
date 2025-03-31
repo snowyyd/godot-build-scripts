@@ -38,18 +38,20 @@ build_steam=0
 godotjs_ref=""
 godotjs_deps_ref=""
 target_os=""
+debug_mode=0
 
-while getopts "h?t:v:j:d:g:b:fsc" opt; do
+while getopts "h?t:v:j:d:g:b:z:fsc" opt; do
   case "$opt" in
   h|\?)
     echo "Usage: $0 [OPTIONS...]"
     echo
-    echo "  -v target os (e.g. linux) [mandatory]"
+    echo "  -t target os (e.g. linux) [mandatory]"
     echo "  -v godot version (e.g. 3.1-alpha5) [mandatory]"
     echo "  -j godotjs branch (e.g. main) [mandatory]"
     echo "  -d godotjs deps ref (e.g. v8_12.4.254.21_r13) [mandatory]"
     echo "  -g git treeish (e.g. master)"
     echo "  -b all|classical|mono (default: all)"
+    echo "  -z (enables debug mode)"
     echo
     exit 1
     ;;
@@ -74,6 +76,9 @@ while getopts "h?t:v:j:d:g:b:fsc" opt; do
     elif [ "$OPTARG" == "mono" ]; then
       build_classical=0
     fi
+    ;;
+  z)
+    debug_mode=1
     ;;
   esac
 done
@@ -201,10 +206,10 @@ TARBALL_GZIP_NAME="${TARBALL_TEMPLATE_NAME}.tar.gz"
 if [ ! -f ${TARBALL_GZIP_NAME} ]; then
   git clone https://github.com/godotengine/godot git || /bin/true
   pushd git
-  # git checkout -b ${git_treeish} origin/${git_treeish} || git checkout ${git_treeish}
-  # git reset --hard
-  # git clean -fdx
-  # git pull origin ${git_treeish} || /bin/true
+  git checkout -b ${git_treeish} origin/${git_treeish} || git checkout ${git_treeish}
+  git reset --hard
+  git clean -fdx
+  git pull origin ${git_treeish} || /bin/true
 
   # I'm not gonna make python3 a local dependency just for this simple check lol
   # Validate version
@@ -225,7 +230,14 @@ if [ ! -f ${TARBALL_GZIP_NAME} ]; then
   # Download GodotJS
   GODOTJS_MOD_DIR="modules/GodotJS"
   if [ ! -d ${GODOTJS_MOD_DIR} ]; then
-    git clone --depth 1 --recursive --branch ${godotjs_ref} https://github.com/godotjs/godotjs ${GODOTJS_MOD_DIR}
+    git clone --recursive https://github.com/godotjs/godotjs ${GODOTJS_MOD_DIR}
+    pushd ${GODOTJS_MOD_DIR}
+    git checkout -b ${godotjs_ref} origin/${godotjs_ref} || git checkout ${godotjs_ref}
+    git reset --hard
+    git clean -fdx
+    git pull origin ${godotjs_ref} || /bin/true
+    # rm -rf .git
+    popd
   fi
 
   # Download GodotJS deps
@@ -239,9 +251,6 @@ if [ ! -f ${TARBALL_GZIP_NAME} ]; then
     7z x -o${GODOTJS_MOD_DIR} ./v8.zip
     rm ./v8.zip || /bin/true
   fi
-
-  # add GodotJS
-  rm -rf ${GODOTJS_MOD_DIR}/.git
   
   # make tarball
   HEAD=$(git rev-parse $git_treeish)
@@ -271,42 +280,47 @@ fi
 export podman_run="${podman} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} -v ${basedir}/${TARBALL_GZIP_NAME}:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
 export img_version=$IMAGE_VERSION
 
+run_command="bash build/build.sh"
+if [[ "$debug_mode" -eq 1 ]]; then
+  run_command="sleep infinity"
+fi
+
 case "$target_os" in
   mono-glue)
     echo "Building the common mono-glue..."
     mkdir -p ${basedir}/mono-glue
-    ${podman_run} -v ${basedir}/build-mono-glue:/root/build ${REPOSITORY_PREFIX}godot-linux:${img_version} bash build/build.sh 2>&1 | tee ${basedir}/out/logs/mono-glue
+    ${podman_run} -v ${basedir}/build-mono-glue:/root/build ${REPOSITORY_PREFIX}godot-linux:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/mono-glue
     echo "Done! Now exec this script again with a real target os"
     ;;
   windows)
     echo "Building for Windows..."
     mkdir -p ${basedir}/out/windows
-    ${podman_run} -v ${basedir}/build-windows:/root/build -v ${basedir}/out/windows:/root/out -v ${basedir}/deps/angle:/root/angle -v ${basedir}/deps/mesa:/root/mesa -v ${basedir}/deps/accesskit:/root/accesskit --env STEAM=${build_steam} ${REPOSITORY_PREFIX}godot-windows:${img_version} bash build/build.sh 2>&1 | tee ${basedir}/out/logs/windows
+    ${podman_run} -v ${basedir}/build-windows:/root/build -v ${basedir}/out/windows:/root/out -v ${basedir}/deps/angle:/root/angle -v ${basedir}/deps/mesa:/root/mesa -v ${basedir}/deps/accesskit:/root/accesskit --env STEAM=${build_steam} ${REPOSITORY_PREFIX}godot-windows:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/windows
     ;;
   linux)
     echo "Building for Linux..."
     mkdir -p ${basedir}/out/linux
-    ${podman_run} -v ${basedir}/build-linux:/root/build -v ${basedir}/out/linux:/root/out -v ${basedir}/deps/accesskit:/root/accesskit ${REPOSITORY_PREFIX}godot-linux:${img_version} bash build/build.sh 2>&1 | tee ${basedir}/out/logs/linux
+    ${podman_run} -v ${basedir}/build-linux:/root/build -v ${basedir}/out/linux:/root/out -v ${basedir}/deps/accesskit:/root/accesskit ${REPOSITORY_PREFIX}godot-linux:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/linux
     ;;
   web)
     echo "Building for web..."
     mkdir -p ${basedir}/out/web
-    ${podman_run} -v ${basedir}/build-web:/root/build -v ${basedir}/out/web:/root/out ${REPOSITORY_PREFIX}godot-web:${img_version} bash build/build.sh 2>&1 | tee ${basedir}/out/logs/web
+    ${podman_run} -v ${basedir}/build-web:/root/build -v ${basedir}/out/web:/root/out ${REPOSITORY_PREFIX}godot-web:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/web
     ;;
   macos)
     echo "Building for macOS..."
     mkdir -p ${basedir}/out/macos
-    ${podman_run} -v ${basedir}/build-macos:/root/build -v ${basedir}/out/macos:/root/out -v ${basedir}/deps/accesskit:/root/accesskit -v ${basedir}/deps/moltenvk:/root/moltenvk -v ${basedir}/deps/angle:/root/angle ${REPOSITORY_PREFIX}godot-osx:${img_version} bash build/build.sh 2>&1 | tee ${basedir}/out/logs/macos
+    ${podman_run} -v ${basedir}/build-macos:/root/build -v ${basedir}/out/macos:/root/out -v ${basedir}/deps/accesskit:/root/accesskit -v ${basedir}/deps/moltenvk:/root/moltenvk -v ${basedir}/deps/angle:/root/angle ${REPOSITORY_PREFIX}godot-osx:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/macos
     ;;
   android)
     echo "Building for android..."
     mkdir -p ${basedir}/out/android
-    ${podman_run} -v ${basedir}/build-android:/root/build -v ${basedir}/out/android:/root/out -v ${basedir}/deps/swappy:/root/swappy -v ${basedir}/deps/keystore:/root/keystore ${REPOSITORY_PREFIX}godot-android:${img_version} bash build/build.sh 2>&1 | tee ${basedir}/out/logs/android
+    ${podman_run} -v ${basedir}/build-android:/root/build -v ${basedir}/out/android:/root/out -v ${basedir}/deps/swappy:/root/swappy -v ${basedir}/deps/keystore:/root/keystore ${REPOSITORY_PREFIX}godot-android:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/android
     ;;
   ios)
     echo "Building for iOS..."
     mkdir -p ${basedir}/out/ios
-    ${podman_run} -v ${basedir}/build-ios:/root/build -v ${basedir}/out/ios:/root/out ${REPOSITORY_PREFIX}godot-ios:${img_version} bash build/build.sh 2>&1 | tee ${basedir}/out/logs/ios
+    ${podman_run} -v ${basedir}/build-ios:/root/build -v ${basedir}/out/ios:/root/out ${REPOSITORY_PREFIX}godot-ios:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/ios
     ;;
   *)
     echo "Valid targets: mono-glue, windows, linux, macos, web, android, ios"
