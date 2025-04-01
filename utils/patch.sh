@@ -39,12 +39,14 @@ case "$1" in
         echo "Applying patches..."
         backup_and_patch "${G_GODOT_SCRIPTS_DIR}/build.sh" "${G_PATCHES_DIR}/build.sh"
         backup_and_patch "${G_GODOT_SCRIPTS_DIR}/build-windows/build.sh" "${G_PATCHES_DIR}/build-windows.sh"
+        backup_and_patch "${G_GODOT_SCRIPTS_DIR}/build-linux/build.sh" "${G_PATCHES_DIR}/build-linux.sh"
         backup_and_patch "${G_GODOT_SCRIPTS_DIR}/config.sh.in" "${G_PATCHES_DIR}/config.sh.in"
         ;;
     restore)
         echo "Restoring backups..."
         restore_backup "${G_GODOT_SCRIPTS_DIR}/build.sh"
         restore_backup "${G_GODOT_SCRIPTS_DIR}/build-windows/build.sh"
+        restore_backup "${G_GODOT_SCRIPTS_DIR}/build-linux/build.sh"
         restore_backup "${G_GODOT_SCRIPTS_DIR}/config.sh.in"
         ;;
     *)

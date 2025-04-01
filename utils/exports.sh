@@ -3,6 +3,7 @@
 export G_GODOT_REF="4.4.1-stable"
 export G_GODOTJS_REF="main"
 export G_GODOTJS_DEPS_REF="v8_12.4.254.21_r13"
+export G_JS_ENGINE="qjs_ng"
 export G_GODOT_CONTAINERS_REF="main"
 export G_GODOT_SCRIPTS_REF="main"
 

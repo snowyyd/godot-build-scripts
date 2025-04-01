@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+# Based on: https://github.com/godotengine/godot-build-scripts/blob/3348432f38773fcaaba0d90432832663fe65cc4d/build.sh
+
 OPTIND=1
 
 export basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -39,8 +41,9 @@ godotjs_ref=""
 godotjs_deps_ref=""
 target_os=""
 debug_mode=0
+js_engine="qjs_ng"
 
-while getopts "h?t:v:j:d:g:b:z:fsc" opt; do
+while getopts "h?t:v:j:d:e:g:b:z:fsc" opt; do
   case "$opt" in
   h|\?)
     echo "Usage: $0 [OPTIONS...]"
@@ -49,6 +52,7 @@ while getopts "h?t:v:j:d:g:b:z:fsc" opt; do
     echo "  -v godot version (e.g. 3.1-alpha5) [mandatory]"
     echo "  -j godotjs branch (e.g. main) [mandatory]"
     echo "  -d godotjs deps ref (e.g. v8_12.4.254.21_r13) [mandatory]"
+    echo "  -e js engine (v8, qjs_ng, qjs, jsc) (default: qjs_ng)"
     echo "  -g git treeish (e.g. master)"
     echo "  -b all|classical|mono (default: all)"
     echo "  -z debug mode (true, false) (default: false)"
@@ -66,6 +70,9 @@ while getopts "h?t:v:j:d:g:b:z:fsc" opt; do
     ;;
   d)
     godotjs_deps_ref=$OPTARG
+    ;;
+  e)
+    js_engine=$OPTARG
     ;;
   g)
     git_treeish=$OPTARG
@@ -282,7 +289,7 @@ fi
 export podman_run="${podman} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} --env SCRIPT_AES256_ENCRYPTION_KEY=${SCRIPT_AES256_ENCRYPTION_KEY} -v ${basedir}/${TARBALL_GZIP_NAME}:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
 export img_version=$IMAGE_VERSION
 
-run_command="bash build/build.sh"
+run_command="bash build/build.sh ${js_engine}"
 if [[ "$debug_mode" -eq 1 ]]; then
   run_command="sleep infinity"
   echo "WARN: You are running in debug mode, no build will be performed"
