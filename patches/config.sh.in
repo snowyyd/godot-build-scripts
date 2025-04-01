@@ -47,7 +47,7 @@ export REGISTRY=''
 export IMAGE_VERSION='latest'
 
 # Default build name used to distinguish between official and custom builds.
-export BUILD_NAME='GodotJS'
+export BUILD_NAME='js'
 
 # Default number of parallel cores for each build.
 export NUM_CORES=16

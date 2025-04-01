@@ -13,9 +13,9 @@ export TERM=xterm
 
 # Setup
 case "$1" in
-  v8) echo "Using v8 JS Engine!"; BUILD_NAME="${BUILD_NAME}.v8";;
-  qjs_ng) echo "Using QuickJS-NG JS Engine!"; OPTIONS="${OPTIONS} use_quickjs_ng=yes"; BUILD_NAME="${BUILD_NAME}.ng";;
-  qjs) echo "Using QuickJS JS Engine!"; OPTIONS="${OPTIONS} use_quickjs=yes"; BUILD_NAME="${BUILD_NAME}.qjs";;
+  v8) echo "Using v8 JS Engine!"; BUILD_NAME="${BUILD_NAME}-v8";;
+  qjs_ng) echo "Using QuickJS-NG JS Engine!"; OPTIONS="${OPTIONS} use_quickjs_ng=yes"; BUILD_NAME="${BUILD_NAME}-ng";;
+  qjs) echo "Using QuickJS JS Engine!"; OPTIONS="${OPTIONS} use_quickjs=yes"; BUILD_NAME="${BUILD_NAME}-qjs";;
   *) echo "Usage: $0 <js engine> (Available engines: v8, qjs_ng, qjs)"; exit 1;;
 esac
 
@@ -91,7 +91,6 @@ fi
 
 if [ "${MONO}" == "1" ]; then
   echo "Starting Mono build for Windows..."
-  BUILD_NAME="mono.${BUILD_NAME}"
 
   cp -r /root/mono-glue/GodotSharp/GodotSharp/Generated modules/mono/glue/GodotSharp/GodotSharp/
   cp -r /root/mono-glue/GodotSharp/GodotSharpEditor/Generated modules/mono/glue/GodotSharp/GodotSharpEditor/
