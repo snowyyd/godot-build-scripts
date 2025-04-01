@@ -11,7 +11,7 @@ source ${G_UTILS_DIR}/setup.sh
 # == Begin Menu ==
 target_os=""
 godot_version="4.4.1-stable"
-git_treeish="master"
+git_treeish="4.4.1-stable"
 build_type="all"
 godotjs_ref="main"
 godotjs_deps_ref="v8_12.4.254.21_r13"
