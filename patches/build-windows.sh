@@ -12,31 +12,11 @@ export OPTIONS_LLVM="use_llvm=yes mingw_prefix=/root/llvm-mingw"
 export TERM=xterm
 
 # Setup
-if [ -z "$1" ]; then
-  echo "Usage: $0 <js engine> (Available engines: v8, qjs_ng, qjs)"
-  exit 1
-fi
-
 case "$1" in
-  v8)
-    echo "v8 builds are not yet supported on mingw!"
-    # echo "Using v8 JS Engine!"
-    # BUILD_NAME="${BUILD_NAME}-v8"
-    ;;
-  qjs_ng)
-    echo "Using QuickJS-NG JS Engine!"
-    OPTIONS="${OPTIONS} use_quickjs_ng=yes"
-    BUILD_NAME="${BUILD_NAME}-ng"
-    ;;
-  qjs)
-    echo "Using QuickJS JS Engine!"
-    OPTIONS="${OPTIONS} use_quickjs=yes"
-    BUILD_NAME="${BUILD_NAME}-qjs"
-    ;;
-  *)
-  echo "Invalid JS Engine!"
-    exit 1
-    ;;
+  v8) echo "Using v8 JS Engine!"; BUILD_NAME="${BUILD_NAME}.v8";;
+  qjs_ng) echo "Using QuickJS-NG JS Engine!"; OPTIONS="${OPTIONS} use_quickjs_ng=yes"; BUILD_NAME="${BUILD_NAME}.ng";;
+  qjs) echo "Using QuickJS JS Engine!"; OPTIONS="${OPTIONS} use_quickjs=yes"; BUILD_NAME="${BUILD_NAME}.qjs";;
+  *) echo "Usage: $0 <js engine> (Available engines: v8, qjs_ng, qjs)"; exit 1;;
 esac
 
 rm -rf godot
@@ -51,6 +31,7 @@ if [[ "$1" == "v8" ]]; then
   # TODO: fix v8 on mingw
   # sed -i -e 's/v8_monolith.lib/libv8_monolith.a/' modules/GodotJS/SCsub
   echo "v8 builds are not yet supported on mingw!"
+  exit 1
 else
   # TODO: fix lws on mingw
   sed -i -E 's/lws_support = .+$/lws_support = None/' modules/GodotJS/SCsub
@@ -110,6 +91,7 @@ fi
 
 if [ "${MONO}" == "1" ]; then
   echo "Starting Mono build for Windows..."
+  BUILD_NAME="mono.${BUILD_NAME}"
 
   cp -r /root/mono-glue/GodotSharp/GodotSharp/Generated modules/mono/glue/GodotSharp/GodotSharp/
   cp -r /root/mono-glue/GodotSharp/GodotSharpEditor/Generated modules/mono/glue/GodotSharp/GodotSharpEditor/

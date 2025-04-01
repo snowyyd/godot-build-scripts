@@ -32,8 +32,6 @@ while getopts ":hs:c:" option; do
 done
 # == End Menu ==
 
-echo "Working dir: ${G_WORKING_DIR}"
-
 echo "Clonning repos..."
 git clone --depth 1 --recursive --branch ${containers_ref} https://github.com/godotengine/build-containers.git ${G_CONTAINERS_DIR} &
 git clone --depth 1 --recursive --branch ${scripts_ref} https://github.com/godotengine/godot-build-scripts ${G_GODOT_SCRIPTS_DIR} &

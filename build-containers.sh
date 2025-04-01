@@ -8,14 +8,7 @@ source ${SCRIPT_DIR}/utils/exports.sh
 # == Setup ==
 source ${G_UTILS_DIR}/setup.sh
 
-echo "Working dir: ${G_CONTAINERS_DIR}"
-
 # TODO: check if ${G_CONTAINERS_DIR} exists
-
-if [ -z "$1" ]; then
-echo "Usage: $0 <container> (Possible values: base, windows, linux, web, osx, android, ios)"
-exit 1
-fi
 
 buildImage()
 {
@@ -29,5 +22,5 @@ buildImage()
 
 case "$1" in
   base|windows|linux|web|osx|android|ios|xcode) buildImage "$1";;
-  *) echo "Error: Invalid target."; exit 1;;
+  *) echo "Usage: $0 <container> (Possible values: base, windows, linux, web, osx, android, ios)"; exit 1;;
 esac

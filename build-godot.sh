@@ -16,6 +16,7 @@ build_type="all"
 godotjs_ref="main"
 godotjs_deps_ref="v8_12.4.254.21_r13"
 js_engine="qjs_ng"
+debug_mode=0
 
 printHelp()
 {
@@ -32,7 +33,8 @@ printHelp()
   echo
 }
 
-checkArg() {
+checkArg()
+{
   local var_name="$1"
   local flag="$2"
   
@@ -59,13 +61,12 @@ while getopts ":ht:v:j:d:g:b:e:z" option; do
     g) git_treeish=$OPTARG;;
     b) build_type=$OPTARG;;
     e) js_engine=$OPTARG;;
+    z) debug_mode=1;;
   esac
 done
 
 checkArg "target_os" "-t"
 # == End Menu ==
-
-echo "Working dir: ${G_GODOT_SCRIPTS_DIR}"
 
 # == Setup requirements ==
 echo "Setting up requirements..."
@@ -77,22 +78,21 @@ if [ -f "${G_WORKING_DIR}/config.sh" ]; then
 fi
 
 # == Start build ==
-GREEN='\033[1;32m'
-NC='\033[0m'
-echo "Build parameters:"
-echo -e "  ${GREEN}target os:${NC} ${target_os}"
-echo -e "  ${GREEN}godot version:${NC} ${godot_version}"
-echo -e "  ${GREEN}godot ref:${NC} ${git_treeish}"
-echo -e "  ${GREEN}godotjs ref:${NC} ${godotjs_ref}"
-echo -e "  ${GREEN}godotjs deps ref:${NC} ${godotjs_deps_ref}"
-echo -e "  ${GREEN}build type:${NC} ${build_type}"
-echo -e "  ${GREEN}js engine:${NC} ${js_engine}"
+declare -A dict=(
+	[target]=$target_os
+	[ge_ver]=$godot_version
+	[ge_ref]=$git_treeish
+	[gjs_ref]=$godotjs_ref
+	[deps_ref]=$godotjs_deps_ref
+	[build]=$build_type
+	[jse]=$js_engine
+  [dbg]=$debug_mdoe
+)
 
-bash ${G_GODOT_SCRIPTS_DIR}/build.sh -t ${target_os} -v ${godot_version} -j ${godotjs_ref} -d ${godotjs_deps_ref} -g ${git_treeish} -b ${build_type} -e ${js_engine}
+json=$(jq -n '[$ARGS.positional | _nwise(2) | {(.[0]): .[1]}] | add' --args "${dict[@]@k}")
+echo "$json"
 
-# Example: bash build-godot.sh mono-glue && bash build-godot.sh linux
-
-# == After build ==
+bash ${G_GODOT_SCRIPTS_DIR}/build.sh "${json}"
 # bash ${G_UTILS_DIR}/patch.sh restore
 
 echo "All done! :-)"

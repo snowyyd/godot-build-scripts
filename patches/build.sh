@@ -3,8 +3,6 @@ set -e
 
 # Based on: https://github.com/godotengine/godot-build-scripts/blob/3348432f38773fcaaba0d90432832663fe65cc4d/build.sh
 
-OPTIND=1
-
 export basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 pushd ${basedir}
 
@@ -16,6 +14,29 @@ mkdir -p ${basedir}/mono-glue
 exec > >(tee -a "out/logs/build") 2>&1
 
 # Config
+if [[ $# -eq 0 ]]; then
+  echo "Error: JSON input not found."
+  exit 1
+fi
+
+target_os=$(echo "$1" | jq -r '.target')
+godot_version=$(echo "$1" | jq -r '.ge_ver')
+git_treeish=$(echo "$1" | jq -r '.ge_ref')
+godotjs_ref=$(echo "$1" | jq -r '.gjs_ref')
+godotjs_deps_ref=$(echo "$1" | jq -r '.deps_ref')
+build_type=$(echo "$1" | jq -r '.build')
+js_engine=$(echo "$1" | jq -r '.jse')
+debug_mode=$(echo "$1" | jq -r '.dbg')
+
+build_classical=1
+build_mono=1
+build_steam=0
+case "$build_type" in
+  classical) build_mono=0;;
+  mono) build_classical=0;;
+  all) build_mono=1;build_classical=1;;
+  *) echo "Error: Invalid build type."; exit 1
+esac
 
 # For default registry and number of cores.
 if [ ! -e config.sh ]; then
@@ -32,87 +53,8 @@ if [ -z "${NUM_CORES}" ]; then
   export NUM_CORES=16
 fi
 
-# == Begin Menu ==
-
-godot_version=""
-git_treeish="master"
-build_classical=1
-build_mono=1
-build_steam=0
-godotjs_ref=""
-godotjs_deps_ref=""
-target_os=""
-debug_mode=0
-js_engine="qjs_ng"
-
-printHelp()
-{
-  echo "Usage: $0 [OPTIONS...]"
-  echo
-  printf "  -t <target os>\tRequired. Target os\n\t\t\tPossible values: mono-glue, windows, linux, web, macos, android, ios\n"
-  printf "  -v <version>\t\tRequired. Godot Engine version (e.g. 4.4.1-stable)\n"
-  printf "  -j <ref>\t\tRequired. GodotJS git ref (e.g. main)\n"
-  printf "  -d <ref>\t\tRequired. GodotJS-Dependencies release ref (e.g. v8_12.4.254.21_r13)\n"
-  printf "  -g [ref]\t\tOptional. Godot Engine git ref (e.g. master)\n"
-  printf "  -b [type=all]\t\tOptional. Build type. Possible values: all, classical, mono\n"
-  printf "  -e [engine=qjs_ng]\tOptional. JS Engine. Possible values: v8, qjs, qjs_ng, jsc\n"
-  printf "  -z\t\t\tOptional. Toggle debug mode\n"
-  echo
-}
-
-checkArg() {
-  local var_name="$1"
-  local flag="$2"
-  
-  if [ -z "${!var_name}" ]; then
-    echo "Error: Argument '$flag' is required."
-    exit 1
-  fi
-}
-
-if [[ $# -eq 0 ]]; then
-  printHelp
-  exit 1
-fi
-
-while getopts ":ht:v:j:d:g:b:e:z" option; do
-  case $option in
-    h) printHelp; exit;;
-    \?) echo "Error: Invalid option."; printHelp; exit;;
-    :) echo "Error: Argument '-$OPTARG' requires a value."; exit;;
-    t) case "$OPTARG" in
-        mono-glue|windows|linux|web|macos|android|ios) target_os=$OPTARG;;
-        *) echo "Error: Invalid target OS."; exit 1
-      esac;;
-    v) godot_version=$OPTARG;;
-    j) godotjs_ref=$OPTARG;;
-    d) godotjs_deps_ref=$OPTARG;;
-    g) git_treeish=$OPTARG;;
-    b) case "$OPTARG" in
-        classical) build_mono=0;;
-        mono) build_classical=0;;
-        all) build_mono=1;build_classical=1;;
-        *) echo "Error: Invalid build type."; exit 1
-      esac;;
-    e) case "$OPTARG" in
-        v8|qjs|qjs_ng|jsc) js_engine=$OPTARG;;
-        *) echo "Error: Invalid JS Engine."; exit 1;
-      esac;;
-    z) debug_mode=1;;
-  esac
-done
-
-checkArg "target_os" "-t"
-checkArg "godot_version" "-v"
-checkArg "godotjs_ref" "-j"
-checkArg "godotjs_deps_ref" "-d"
-
-# == End Menu ==
-
-export podman=${PODMAN}
-
 REPOSITORY_PREFIX="localhost/"
-if [[ ${podman} == "docker" ]]; then
+if [[ ${PODMAN} == "docker" ]]; then
   REPOSITORY_PREFIX=""
 fi
 
@@ -283,8 +225,7 @@ else
   echo "${TARBALL_GZIP_NAME} already exists, skipping downloads..."
 fi
 
-export podman_run="${podman} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} --env SCRIPT_AES256_ENCRYPTION_KEY=${SCRIPT_AES256_ENCRYPTION_KEY} -v ${basedir}/${TARBALL_GZIP_NAME}:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
-export img_version=$IMAGE_VERSION
+podman_run="${PODMAN} run -it --rm --env BUILD_NAME=${BUILD_NAME} --env GODOT_VERSION_STATUS=${GODOT_VERSION_STATUS} --env NUM_CORES=${NUM_CORES} --env CLASSICAL=${build_classical} --env MONO=${build_mono} --env SCRIPT_AES256_ENCRYPTION_KEY=${SCRIPT_AES256_ENCRYPTION_KEY} -v ${basedir}/${TARBALL_GZIP_NAME}:/root/godot.tar.gz -v ${basedir}/mono-glue:/root/mono-glue -w /root/"
 
 run_command="bash build/build.sh ${js_engine}"
 if [[ "$debug_mode" -eq 1 ]]; then
@@ -296,38 +237,38 @@ case "$target_os" in
   mono-glue)
     echo "Building the common mono-glue..."
     mkdir -p ${basedir}/mono-glue
-    ${podman_run} -v ${basedir}/build-mono-glue:/root/build ${REPOSITORY_PREFIX}godot-linux:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/mono-glue
+    ${podman_run} -v ${basedir}/build-mono-glue:/root/build ${REPOSITORY_PREFIX}godot-linux:${IMAGE_VERSION} ${run_command} 2>&1 | tee ${basedir}/out/logs/mono-glue
     echo "Done! Now exec this script again with a real target os"
     ;;
   windows)
     echo "Building for Windows..."
     mkdir -p ${basedir}/out/windows
-    ${podman_run} -v ${basedir}/build-windows:/root/build -v ${basedir}/out/windows:/root/out -v ${basedir}/deps/angle:/root/angle -v ${basedir}/deps/mesa:/root/mesa -v ${basedir}/deps/accesskit:/root/accesskit --env STEAM=${build_steam} ${REPOSITORY_PREFIX}godot-windows:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/windows
+    ${podman_run} -v ${basedir}/build-windows:/root/build -v ${basedir}/out/windows:/root/out -v ${basedir}/deps/angle:/root/angle -v ${basedir}/deps/mesa:/root/mesa -v ${basedir}/deps/accesskit:/root/accesskit --env STEAM=${build_steam} ${REPOSITORY_PREFIX}godot-windows:${IMAGE_VERSION} ${run_command} 2>&1 | tee ${basedir}/out/logs/windows
     ;;
   linux)
     echo "Building for Linux..."
     mkdir -p ${basedir}/out/linux
-    ${podman_run} -v ${basedir}/build-linux:/root/build -v ${basedir}/out/linux:/root/out -v ${basedir}/deps/accesskit:/root/accesskit ${REPOSITORY_PREFIX}godot-linux:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/linux
+    ${podman_run} -v ${basedir}/build-linux:/root/build -v ${basedir}/out/linux:/root/out -v ${basedir}/deps/accesskit:/root/accesskit ${REPOSITORY_PREFIX}godot-linux:${IMAGE_VERSION} ${run_command} 2>&1 | tee ${basedir}/out/logs/linux
     ;;
   web)
     echo "Building for web..."
     mkdir -p ${basedir}/out/web
-    ${podman_run} -v ${basedir}/build-web:/root/build -v ${basedir}/out/web:/root/out ${REPOSITORY_PREFIX}godot-web:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/web
+    ${podman_run} -v ${basedir}/build-web:/root/build -v ${basedir}/out/web:/root/out ${REPOSITORY_PREFIX}godot-web:${IMAGE_VERSION} ${run_command} 2>&1 | tee ${basedir}/out/logs/web
     ;;
   macos)
     echo "Building for macOS..."
     mkdir -p ${basedir}/out/macos
-    ${podman_run} -v ${basedir}/build-macos:/root/build -v ${basedir}/out/macos:/root/out -v ${basedir}/deps/accesskit:/root/accesskit -v ${basedir}/deps/moltenvk:/root/moltenvk -v ${basedir}/deps/angle:/root/angle ${REPOSITORY_PREFIX}godot-osx:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/macos
+    ${podman_run} -v ${basedir}/build-macos:/root/build -v ${basedir}/out/macos:/root/out -v ${basedir}/deps/accesskit:/root/accesskit -v ${basedir}/deps/moltenvk:/root/moltenvk -v ${basedir}/deps/angle:/root/angle ${REPOSITORY_PREFIX}godot-osx:${IMAGE_VERSION} ${run_command} 2>&1 | tee ${basedir}/out/logs/macos
     ;;
   android)
     echo "Building for android..."
     mkdir -p ${basedir}/out/android
-    ${podman_run} -v ${basedir}/build-android:/root/build -v ${basedir}/out/android:/root/out -v ${basedir}/deps/swappy:/root/swappy -v ${basedir}/deps/keystore:/root/keystore ${REPOSITORY_PREFIX}godot-android:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/android
+    ${podman_run} -v ${basedir}/build-android:/root/build -v ${basedir}/out/android:/root/out -v ${basedir}/deps/swappy:/root/swappy -v ${basedir}/deps/keystore:/root/keystore ${REPOSITORY_PREFIX}godot-android:${IMAGE_VERSION} ${run_command} 2>&1 | tee ${basedir}/out/logs/android
     ;;
   ios)
     echo "Building for iOS..."
     mkdir -p ${basedir}/out/ios
-    ${podman_run} -v ${basedir}/build-ios:/root/build -v ${basedir}/out/ios:/root/out ${REPOSITORY_PREFIX}godot-ios:${img_version} ${run_command} 2>&1 | tee ${basedir}/out/logs/ios
+    ${podman_run} -v ${basedir}/build-ios:/root/build -v ${basedir}/out/ios:/root/out ${REPOSITORY_PREFIX}godot-ios:${IMAGE_VERSION} ${run_command} 2>&1 | tee ${basedir}/out/logs/ios
     ;;
   *)
     echo "Valid targets: mono-glue, windows, linux, macos, web, android, ios"

@@ -5,11 +5,6 @@ set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source ${SCRIPT_DIR}/exports.sh
 
-if [ -z "$1" ]; then
-  echo "Usage: $0 <action> (Possible actions: apply, restore)"
-  exit 1
-fi
-
 backup_and_patch()
 {
   local file_path="$1"
@@ -51,5 +46,5 @@ case "$1" in
     restore_backup "${G_GODOT_SCRIPTS_DIR}/build-linux/build.sh"
     restore_backup "${G_GODOT_SCRIPTS_DIR}/config.sh.in"
     ;;
-  *) echo "Invalid action! Possible actions: apply, restore"; exit 1;;
+  *) echo "Usage: $0 <action> (Possible actions: apply, restore)"; exit 1;;
 esac
