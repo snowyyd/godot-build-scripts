@@ -32,6 +32,8 @@ if [ -z "${NUM_CORES}" ]; then
   export NUM_CORES=16
 fi
 
+# == Begin Menu ==
+
 godot_version=""
 git_treeish="master"
 build_classical=1
@@ -43,80 +45,75 @@ target_os=""
 debug_mode=0
 js_engine="qjs_ng"
 
-while getopts "h?t:v:j:d:e:g:b:z:fsc" opt; do
-  case "$opt" in
-  h|\?)
-    echo "Usage: $0 [OPTIONS...]"
-    echo
-    echo "  -t target os (e.g. linux) [mandatory]"
-    echo "  -v godot version (e.g. 3.1-alpha5) [mandatory]"
-    echo "  -j godotjs branch (e.g. main) [mandatory]"
-    echo "  -d godotjs deps ref (e.g. v8_12.4.254.21_r13) [mandatory]"
-    echo "  -e js engine (v8, qjs_ng, qjs, jsc) (default: qjs_ng)"
-    echo "  -g git treeish (e.g. master)"
-    echo "  -b all|classical|mono (default: all)"
-    echo "  -z debug mode (true, false) (default: false)"
-    echo
+printHelp()
+{
+  echo "Usage: $0 [OPTIONS...]"
+  echo
+  printf "  -t <target os>\tRequired. Target os\n\t\t\tPossible values: mono-glue, windows, linux, web, macos, android, ios\n"
+  printf "  -v <version>\t\tRequired. Godot Engine version (e.g. 4.4.1-stable)\n"
+  printf "  -j <ref>\t\tRequired. GodotJS git ref (e.g. main)\n"
+  printf "  -d <ref>\t\tRequired. GodotJS-Dependencies release ref (e.g. v8_12.4.254.21_r13)\n"
+  printf "  -g [ref]\t\tOptional. Godot Engine git ref (e.g. master)\n"
+  printf "  -b [type=all]\t\tOptional. Build type. Possible values: all, classical, mono\n"
+  printf "  -e [engine=qjs_ng]\tOptional. JS Engine. Possible values: v8, qjs, qjs_ng, jsc\n"
+  printf "  -z\t\t\tOptional. Toggle debug mode\n"
+  echo
+}
+
+checkArg() {
+  local var_name="$1"
+  local flag="$2"
+  
+  if [ -z "${!var_name}" ]; then
+    echo "Error: Argument '$flag' is required."
     exit 1
-    ;;
-  t)
-    target_os=$OPTARG
-    ;;
-  v)
-    godot_version=$OPTARG
-    ;;
-  j)
-    godotjs_ref=$OPTARG
-    ;;
-  d)
-    godotjs_deps_ref=$OPTARG
-    ;;
-  e)
-    js_engine=$OPTARG
-    ;;
-  g)
-    git_treeish=$OPTARG
-    ;;
-  b)
-    if [ "$OPTARG" == "classical" ]; then
-      build_mono=0
-    elif [ "$OPTARG" == "mono" ]; then
-      build_classical=0
-    fi
-    ;;
-  z)
-    if [ "$OPTARG" == "true" ]; then
-      debug_mode=1
-    fi
-    ;;
+  fi
+}
+
+if [[ $# -eq 0 ]]; then
+  printHelp
+  exit 1
+fi
+
+while getopts ":ht:v:j:d:g:b:e:z" option; do
+  case $option in
+    h) printHelp; exit;;
+    \?) echo "Error: Invalid option."; printHelp; exit;;
+    :) echo "Error: Argument '-$OPTARG' requires a value."; exit;;
+    t) case "$OPTARG" in
+        mono-glue|windows|linux|web|macos|android|ios) target_os=$OPTARG;;
+        *) echo "Error: Invalid target OS."; exit 1
+      esac;;
+    v) godot_version=$OPTARG;;
+    j) godotjs_ref=$OPTARG;;
+    d) godotjs_deps_ref=$OPTARG;;
+    g) git_treeish=$OPTARG;;
+    b) case "$OPTARG" in
+        classical) build_mono=0;;
+        mono) build_classical=0;;
+        all) build_mono=1;build_classical=1;;
+        *) echo "Error: Invalid build type."; exit 1
+      esac;;
+    e) case "$OPTARG" in
+        v8|qjs|qjs_ng|jsc) js_engine=$OPTARG;;
+        *) echo "Error: Invalid JS Engine."; exit 1;
+      esac;;
+    z) debug_mode=1;;
   esac
 done
+
+checkArg "target_os" "-t"
+checkArg "godot_version" "-v"
+checkArg "godotjs_ref" "-j"
+checkArg "godotjs_deps_ref" "-d"
+
+# == End Menu ==
 
 export podman=${PODMAN}
 
 REPOSITORY_PREFIX="localhost/"
 if [[ ${podman} == "docker" ]]; then
   REPOSITORY_PREFIX=""
-fi
-
-if [ -z "${target_os}" ]; then
-  echo "-t <target> is mandatory!"
-  exit 1
-fi
-
-if [ -z "${godot_version}" ]; then
-  echo "-v <version> is mandatory!"
-  exit 1
-fi
-
-if [ -z "${godotjs_ref}" ]; then
-  echo "-j <branch> is mandatory!"
-  exit 1
-fi
-
-if [ -z "${godotjs_deps_ref}" ]; then
-  echo "-d <ref> is mandatory!"
-  exit 1
 fi
 
 IFS=- read version status <<< "$godot_version"
