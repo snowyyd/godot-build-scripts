@@ -79,14 +79,14 @@ fi
 
 # == Start build ==
 declare -A dict=(
-	[target]=$target_os
-	[ge_ver]=$godot_version
-	[ge_ref]=$git_treeish
-	[gjs_ref]=$godotjs_ref
-	[deps_ref]=$godotjs_deps_ref
-	[build]=$build_type
-	[jse]=$js_engine
-  [dbg]=$debug_mdoe
+	[target_os]=$target_os
+	[godot_version]=$godot_version
+	[git_treeish]=$git_treeish
+	[godotjs_ref]=$godotjs_ref
+	[godotjs_deps_ref]=$godotjs_deps_ref
+	[build_type]=$build_type
+	[js_engine]=$js_engine
+  [debug_mode]=$debug_mode
 )
 
 json=$(jq -n '[$ARGS.positional | _nwise(2) | {(.[0]): .[1]}] | add' --args "${dict[@]@k}")

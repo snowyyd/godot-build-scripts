@@ -19,14 +19,8 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-target_os=$(echo "$1" | jq -r '.target')
-godot_version=$(echo "$1" | jq -r '.ge_ver')
-git_treeish=$(echo "$1" | jq -r '.ge_ref')
-godotjs_ref=$(echo "$1" | jq -r '.gjs_ref')
-godotjs_deps_ref=$(echo "$1" | jq -r '.deps_ref')
-build_type=$(echo "$1" | jq -r '.build')
-js_engine=$(echo "$1" | jq -r '.jse')
-debug_mode=$(echo "$1" | jq -r '.dbg')
+# Extract all json keys in format k=v and eval them as variables
+eval $(echo "$1" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
 
 build_classical=1
 build_mono=1
@@ -45,13 +39,8 @@ if [ ! -e config.sh ]; then
 fi
 source ./config.sh
 
-if [ -z "${BUILD_NAME}" ]; then
-  export BUILD_NAME="custom_build"
-fi
-
-if [ -z "${NUM_CORES}" ]; then
-  export NUM_CORES=16
-fi
+export BUILD_NAME="${BUILD_NAME:-custom_build}"
+export NUM_CORES="${NUM_CORES:-16}"
 
 REPOSITORY_PREFIX="localhost/"
 if [[ ${PODMAN} == "docker" ]]; then
