@@ -3,8 +3,12 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
+import tarfile
+import urllib.request
+import zipfile
 from pathlib import Path
-from typing import Any, Literal, List
+from typing import Any, List, Optional
 
 if __name__ == "__main__":
     raise Exception("This module cannot be run directly")
@@ -13,50 +17,56 @@ if __name__ == "__main__":
 class Colors:
     RESET = "\033[0m"
 
-    # Colors
-    BLACK = "\033[30m"
-    RED = "\033[31m"
-    GREEN = "\033[32m"
-    YELLOW = "\033[33m"
-    BLUE = "\033[34m"
-    MAGENTA = "\033[35m"
-    CYAN = "\033[36m"
-    WHITE = "\033[37m"
+    # Regular Colors
+    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = (
+        "\033[30m",
+        "\033[31m",
+        "\033[32m",
+        "\033[33m",
+        "\033[34m",
+        "\033[35m",
+        "\033[36m",
+        "\033[37m",
+    )
 
-    # Bright colors
-    BRIGHT_BLACK = "\033[90m"
-    BRIGHT_RED = "\033[91m"
-    BRIGHT_GREEN = "\033[92m"
-    BRIGHT_YELLOW = "\033[93m"
-    BRIGHT_BLUE = "\033[94m"
-    BRIGHT_MAGENTA = "\033[95m"
-    BRIGHT_CYAN = "\033[96m"
-    BRIGHT_WHITE = "\033[97m"
+    # Bright Colors
+    BRIGHT_BLACK, BRIGHT_RED, BRIGHT_GREEN, BRIGHT_YELLOW, BRIGHT_BLUE, BRIGHT_MAGENTA, BRIGHT_CYAN, BRIGHT_WHITE = (
+        "\033[90m",
+        "\033[91m",
+        "\033[92m",
+        "\033[93m",
+        "\033[94m",
+        "\033[95m",
+        "\033[96m",
+        "\033[97m",
+    )
 
     # Styles
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
-    REVERSED = "\033[7m"
+    BOLD, UNDERLINE, REVERSED = "\033[1m", "\033[4m", "\033[7m"
 
-    # Backgrounds
-    BG_BLACK = "\033[40m"
-    BG_RED = "\033[41m"
-    BG_GREEN = "\033[42m"
-    BG_YELLOW = "\033[43m"
-    BG_BLUE = "\033[44m"
-    BG_MAGENTA = "\033[45m"
-    BG_CYAN = "\033[46m"
-    BG_WHITE = "\033[47m"
+    # Background Colors
+    BG_BLACK, BG_RED, BG_GREEN, BG_YELLOW, BG_BLUE, BG_MAGENTA, BG_CYAN, BG_WHITE = (
+        "\033[40m",
+        "\033[41m",
+        "\033[42m",
+        "\033[43m",
+        "\033[44m",
+        "\033[45m",
+        "\033[46m",
+        "\033[47m",
+    )
 
-    # Bright backgrounds
-    BG_BRIGHT_BLACK = "\033[100m"
-    BG_BRIGHT_RED = "\033[101m"
-    BG_BRIGHT_GREEN = "\033[102m"
-    BG_BRIGHT_YELLOW = "\033[103m"
-    BG_BRIGHT_BLUE = "\033[104m"
-    BG_BRIGHT_MAGENTA = "\033[105m"
-    BG_BRIGHT_CYAN = "\033[106m"
-    BG_BRIGHT_WHITE = "\033[107m"
+    # Bright Backgrounds
+    (
+        BG_BRIGHT_BLACK,
+        BG_BRIGHT_RED,
+        BG_BRIGHT_GREEN,
+        BG_BRIGHT_YELLOW,
+        BG_BRIGHT_BLUE,
+        BG_BRIGHT_MAGENTA,
+        BG_BRIGHT_CYAN,
+        BG_BRIGHT_WHITE,
+    ) = ("\033[100m", "\033[101m", "\033[102m", "\033[103m", "\033[104m", "\033[105m", "\033[106m", "\033[107m")
 
     @staticmethod
     def color_text(text: str, color: str) -> str:
@@ -69,45 +79,46 @@ class Colors:
 
 class Log:
     @staticmethod
-    def warn(text: str) -> str:
-        return print(Colors.color_text_bold("WARN:", Colors.YELLOW), text)
+    def warn(text: str) -> None:
+        print(Colors.color_text_bold("WARN:", Colors.YELLOW), text)
 
     @staticmethod
-    def err(text: str) -> str:
-        return print(Colors.color_text_bold("ERR:", Colors.RED), text)
+    def err(text: str) -> None:
+        print(Colors.color_text_bold("ERR:", Colors.RED), text)
 
     @staticmethod
-    def info(text: str) -> str:
-        return print(Colors.color_text_bold("INFO:", Colors.GREEN), text)
+    def info(text: str) -> None:
+        print(Colors.color_text_bold("INFO:", Colors.GREEN), text)
 
     @staticmethod
-    def kv(k: str, v: str):
-        return print(Colors.color_text(k + ":", Colors.GREEN), v)
+    def kv(k: str, v: str) -> None:
+        print(Colors.color_text(f"{k}:", Colors.GREEN), v)
 
 
 class CMDChecker:
     commands_to_check: List[str] = ["bash", "git", "curl", "docker", "7z", "tar", "unzip", "gzip", "jq"]
 
     @staticmethod
-    def check(cmds: List[str] = commands_to_check):
-        missing: List[str] = [cmd for cmd in cmds if shutil.which(cmd) is None]
+    def check(cmds: Optional[List[str]] = None):
+        cmds = cmds or CMDChecker.commands_to_check
+        missing = [cmd for cmd in set(cmds) if shutil.which(cmd) is None]
 
         if missing:
-            Log.err(f"missing commands: {', '.join(missing)}")
-            exit(1)
+            Log.err(f"Missing commands: {', '.join(missing)}")
+            raise SystemExit(1)
 
     @staticmethod
     def checkSingle(cmd: str):
         if shutil.which(cmd) is None:
-            Log.err(f"missing command: {cmd}")
-            exit(1)
+            Log.err(f"Missing command: {cmd}")
+            raise SystemExit(1)
 
 
 class Git:
     @staticmethod
-    def clone_repo(repo_url: str, branch: str, target_dir: Path) -> None:
+    def clone_repo(repo_url: str, branch: str, target_dir: str | Path) -> None:
         CMDChecker.checkSingle("git")
-        cmd = shlex.split(f"git clone --recursive --depth 1 --branch {branch} {repo_url} {str(target_dir)}")
+        cmd = shlex.split(f"git clone --recursive --depth 1 --branch {branch} {repo_url} {str(Path(target_dir))}")
         subprocess.run(cmd, check=True)
 
 
@@ -118,9 +129,20 @@ class Containers:
     def build(tool: str, target: str, containers_dir: str | Path):
         CMDChecker.checkSingle(tool)
         Log.info(f"Building {target} using {tool}...")
-        cmd = shlex.split(
-            f'{tool} build --build-arg="img_version=latest" -t godot-{"fedora" if target == "base" else target}:latest -f {containers_dir}/Dockerfile.{target} {containers_dir}'
-        )
+
+        containers_dir = Path(containers_dir).resolve()
+
+        cmd = [
+            tool,
+            "build",
+            "--build-arg=img_version=latest",
+            "-t",
+            f"godot-{'fedora' if target == 'base' else target}:latest",
+            "-f",
+            str(containers_dir / f"Dockerfile.{target}"),
+            str(containers_dir),
+        ]
+
         subprocess.run(cmd, check=True)
 
 
@@ -135,58 +157,56 @@ class Patcher:
 
     @staticmethod
     def backup_and_patch(patch_file: str | Path, dest_file: str | Path):
-        if not os.path.isfile(dest_file):
-            Log.err(f"{dest_file} does not exist")
-            exit(1)
+        patch_file = Path(patch_file)
+        dest_file = Path(dest_file)
 
-        backup_path = dest_file + ".bak"
+        if not dest_file.exists():
+            raise FileNotFoundError(f"Destination file {dest_file} does not exist.")
 
-        if not os.path.isfile(backup_path):
+        backup_path = dest_file.with_suffix(dest_file.suffix + ".bak")
+
+        if not backup_path.exists():
             shutil.copy(dest_file, backup_path)
 
         Log.info(f"Patching {dest_file}...")
         shutil.copy(patch_file, dest_file)
 
     @staticmethod
-    def restore_backup(file_path: os.PathLike):
-        backup_path = file_path + ".bak"
+    def restore_backup(file_path: str | Path):
+        file_path = Path(file_path)
+        backup_path = file_path.with_suffix(file_path.suffix + ".bak")
 
-        if os.path.isfile(backup_path):
+        if backup_path.exists():
             Log.info(f"Restoring backup of {file_path}...")
             shutil.copy(backup_path, file_path)
         else:
             Log.warn(f"No backup found for {file_path}, skipping...")
 
     @staticmethod
-    def copy_files(action: Literal["patch", "restore"], patches_dir: str | Path, scripts_dir: str | Path):
+    def copy_files(action: str, patches_dir: str | Path, scripts_dir: str | Path):
+        patches_path = Path(patches_dir).resolve()
+        scripts_path = Path(scripts_dir).resolve()
 
-        patches_path = Path(patches_dir)
-        scripts_path = Path(scripts_dir)
         if not patches_path.is_absolute():
-            raise Exception("The patches_dir is not absolute!")
+            raise ValueError("The patches_dir must be an absolute path.")
         if not scripts_path.is_absolute():
-            raise Exception("The scripts_dir is not absolute!")
+            raise ValueError("The scripts_dir must be an absolute path.")
 
-        match action:
-            case "patch":
-                for src, dst in Patcher.files:
-                    Patcher.backup_and_patch(
-                        os.path.join(patches_path, src),
-                        os.path.join(scripts_path, dst),
-                    )
+        actions = {
+            "patch": lambda: [
+                Patcher.backup_and_patch(patches_path / src, scripts_path / dst) for src, dst in Patcher.files
+            ],
+            "restore": lambda: [Patcher.restore_backup(scripts_path / dst) for _, dst in Patcher.files],
+        }
 
-            case "restore":
-                for _, dst in Patcher.files:
-                    Patcher.restore_backup(
-                        os.path.join(scripts_path, dst),
-                    )
-
-            case _:
-                raise TypeError("Invalid action")
+        try:
+            actions[action]()
+        except KeyError:
+            raise ValueError("Invalid action. Use 'patch' or 'restore'.")
 
 
 class Config:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str | Path):
         self.config_path = Path(config_path).resolve()
 
         if not self.config_path.is_file():
@@ -194,24 +214,102 @@ class Config:
 
         self._load_config()
 
-    def _load_config(self):
+    def _load_config(self) -> None:
         spec = importlib.util.spec_from_file_location("config", self.config_path)
-        module = importlib.util.module_from_spec(spec)
 
-        if spec.loader is None:
+        if not spec or not spec.loader:
             raise ImportError(f"Could not load module from {self.config_path}")
 
+        module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        for key, value in vars(module).items():
-            if not key.startswith("__"):
-                setattr(self, key, value)
+        self.__dict__.update({k: v for k, v in vars(module).items() if not k.startswith("__")})
 
-    def __repr__(self):
-        return f"Config({self.config_path})"
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.config_path})"
 
     def to_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items() if k != "config_path"}
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.__dict__.get(key, default)
+
+
+def download_file(url: str, destination: str):
+    destination = Path(destination)
+
+    with urllib.request.urlopen(url) as response:
+        total_size = int(response.headers.get("Content-Length", 0))
+        block_size = 8192  # 8 KB
+        downloaded = 0
+
+        Log.info(
+            f"Downloading: {url} -> {destination} ({total_size / 1024:.2f} KB)"
+            if total_size
+            else f"Downloading: {url} -> {destination}"
+        )
+
+        with open(destination, "wb") as out_file:
+            while True:
+                buffer = response.read(block_size)
+                if not buffer:
+                    break
+                out_file.write(buffer)
+                downloaded += len(buffer)
+
+                if total_size:
+                    percentage = downloaded / total_size * 100
+                    progress = int(50 * downloaded / total_size)
+                    sys.stdout.write(
+                        f"\r[{'#' * progress}{'.' * (50 - progress)}] {downloaded / 1024:.2f} KB ({percentage:.2f}%)"
+                    )
+                    sys.stdout.flush()
+
+
+class FileExtractor:
+    @staticmethod
+    def extract_tar(file_path: Path, dest_dir: Path):
+        with tarfile.open(file_path, "r:*") as tar:
+            tar.extractall(dest_dir)
+
+    @staticmethod
+    def extract_zip(file_path: Path, dest_dir: Path):
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall(dest_dir)
+
+    @staticmethod
+    def extract_7z(file_path: Path, dest_dir: Path):
+        subprocess.run(["7z", "x", str(file_path), f"-o{dest_dir}"], capture_output=True, text=True, check=True)
+
+    @staticmethod
+    def extract_file(file_path: str, dest_dir: str = "."):
+        file_path = Path(file_path)
+        dest_dir = Path(dest_dir)
+
+        formats = {
+            (".tar", ".tar.gz", ".tar.bz2", ".tar.xz"): FileExtractor.extract_tar,
+            (".zip",): FileExtractor.extract_zip,
+            (".7z",): FileExtractor.extract_7z,
+        }
+
+        suffix = "".join(file_path.suffixes)
+        for extensions, extractor in formats.items():
+            if suffix in extensions:
+                extractor(file_path, dest_dir)
+                Log.info(f"File {file_path} extracted to {dest_dir}")
+                return
+
+        raise ValueError(f"Unsupported file type: {file_path}")
+
+
+class Dependencies:
+    @staticmethod
+    def download(url: str, dest: str | Path, filename: str) -> None:
+        dest = Path(dest)
+
+        if dest.is_dir():
+            Log.warn(f"{dest} already exists, skipping download...")
+            return
+
+        os.makedirs(dest, exist_ok=True)
+        download_file(url, dest / filename)

@@ -3,16 +3,18 @@
 import argparse
 import json
 import os
+import subprocess
+from pathlib import Path
 from utils import *
 
 # == Load configs ==
 # config = Config("config.py")
 
 # == Variables ==
-work_dir = os.path.dirname(os.path.abspath(__file__))
-patches_dir = os.path.abspath(os.path.join(work_dir, "patches"))
-containers_dir = os.path.abspath(os.path.join(work_dir, "tmp/build-containers"))
-scripts_dir = os.path.abspath(os.path.join(work_dir, "tmp/godot-build-scripts"))
+work_dir = Path(__file__).resolve().parent
+patches_dir = work_dir / "patches"
+containers_dir = work_dir / "tmp/build-containers"
+scripts_dir = work_dir / "tmp/godot-build-scripts"
 
 build_targets = ["mono-glue", "windows", "linux", "web", "macos", "android", "ios"]
 js_engines = ["v8", "qjs", "qjs_ng", "jsc"]
@@ -29,11 +31,11 @@ repos_parser.add_argument("-s", "--scripts-ref", default="main", help="godot-bui
 containers_parser = subparsers.add_parser("containers", help="build containers")
 containers_parser.add_argument("target", choices=Containers.build_targets, help="build target")
 containers_parser.add_argument(
-    "-t", "--tool", default="docker", choices=["podman", "docker"], help=f"containers manangement tool"
+    "-t", "--tool", default="docker", choices=["podman", "docker"], help="containers management tool"
 )
 
 build_parser = subparsers.add_parser("build", help="build Godot Engine")
-build_parser.add_argument("-t", "--target", required=True, choices=build_targets, help=f"build target")
+build_parser.add_argument("-t", "--target", required=True, choices=build_targets, help="build target")
 build_parser.add_argument("-v", "--godot-version", default="4.4.1-stable", help="godot engine version")
 build_parser.add_argument("-j", "--godotjs-ref", default="main", help="godot-js git ref")
 build_parser.add_argument("-d", "--deps-ref", default="v8_12.4.254.21_r13", help="godot-js dependencies release ref")
@@ -44,35 +46,37 @@ build_parser.add_argument("-z", "--debug", action="store_true", help="toggle deb
 
 args = parser.parse_args()
 
-if args.command == "repos":
-    if os.path.exists(containers_dir):
-        Log.err(f"The 'build-containers' dir already exists ({containers_dir}), exiting...")
-        exit(1)
-    if os.path.exists(scripts_dir):
-        Log.err(f"The 'godot-build-scripts' dir already exists ({scripts_dir}), exiting...")
-        exit(1)
 
-    Git.clone_repo("https://github.com/godotengine/build-containers.git", args.containers_ref, containers_dir)
-    Git.clone_repo("https://github.com/godotengine/godot-build-scripts.git", args.scripts_ref, scripts_dir)
+def clone_repositories():
+    if containers_dir.exists():
+        Log.warn(f"The 'build-containers' dir already exists ({containers_dir}). Skipping...")
+    else:
+        Git.clone_repo("https://github.com/godotengine/build-containers.git", args.containers_ref, containers_dir)
 
-elif args.command == "containers":
+    if scripts_dir.exists():
+        Log.warn(f"The 'godot-build-scripts' dir already exists ({scripts_dir}). Skipping...")
+    else:
+        Git.clone_repo("https://github.com/godotengine/godot-build-scripts.git", args.scripts_ref, scripts_dir)
+
+
+def build_container():
     Containers.build(args.tool, args.target, containers_dir)
 
-elif args.command == "build":
-    # == Check if the system has the required commands ==
+
+def build_godot():
+    # Check system dependencies
     CMDChecker.check()
 
-    # == Print config ==
+    # Print config
     for k, v in vars(args).items():
         Log.kv(k, v)
     Log.kv("aes_encryption", "enabled" if os.getenv("SCRIPT_AES256_ENCRYPTION_KEY") else "disabled")
 
-    # == Do prerequisites ==
+    # Apply patches
     Log.info("Patching required files...")
     Patcher.copy_files("patch", patches_dir, scripts_dir)
 
-    # == Start build ==
-    # TODO: merge build.sh with this script
+    # Prepare build configuration
     build_config = {
         "target_os": args.target,
         "godot_version": args.godot_version,
@@ -84,6 +88,18 @@ elif args.command == "build":
         "debug_mode": str(int(args.debug)),
     }
 
-    subprocess.run(["bash", os.path.join(scripts_dir, "build.sh"), json.dumps(build_config)], check=True)
+    # Execute the build script
+    subprocess.run(["bash", str(scripts_dir / "build.sh"), json.dumps(build_config)], check=True)
+    Log.info("Build completed successfully!")
+
+
+# == Command Execution ==
+match args.command:
+    case "repos":
+        clone_repositories()
+    case "containers":
+        build_container()
+    case "build":
+        build_godot()
 
 Log.info("All done!")
