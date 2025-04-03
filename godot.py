@@ -35,7 +35,6 @@ encryption_key = (
 # == Argument Parser ==
 parser = argparse.ArgumentParser(description="Godot Build Script")
 subparsers = parser.add_subparsers(title="subcommands", dest="command", required=True, help="available commands")
-parser.add_argument("--ci", action="store_true", help="enable CI support")
 
 repos_parser = subparsers.add_parser("repos", help="clone base git repositories")
 repos_parser.add_argument("-c", "--containers-ref", help="build-containers git ref")
