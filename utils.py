@@ -178,10 +178,8 @@ class Containers:
 class Patcher:
     files = [
         # format (source [patches folder], dest [godot-build-scripts folder])
-        ("build.sh", "build.sh"),
         ("build-windows.sh", "build-windows/build.sh"),
         ("build-linux.sh", "build-linux/build.sh"),
-        ("config.sh.in", "config.sh.in"),
     ]
 
     @staticmethod
