@@ -197,7 +197,9 @@ def build_godot():
         )
 
         Log.info("Extracting v8...")
-        FileExtractor.extract_file(v8_file, dep_v8_dir)
+        FileExtractor.extract_file(
+            v8_file, godotjs_dir
+        )  # godotjs_dir instead of dep_v8_dir since v8.zip has its own folder called v8
         v8_file.unlink(True)
 
     # 6. Create gzipped tarball
@@ -251,6 +253,7 @@ def build_godot():
             "STEAM": "1" if config.build_steam else "0",
             "SCRIPT_AES256_ENCRYPTION_KEY": encryption_key,
             "JS_ENGINE": args.js_engine,
+            "DEBUG_MODE": "1" if args.debug else "0",
         },
         {
             final_tar_path: "/root/godot.tar.gz",

@@ -5,15 +5,22 @@ set -e
 
 # Config
 
-export SCONS="scons -j${NUM_CORES} verbose=yes warnings=no progress=no"
+export SCONS="scons -j${NUM_CORES} verbose=no warnings=no progress=no"
 export OPTIONS="production=yes accesskit_sdk_path=/root/accesskit/accesskit-c"
 export OPTIONS_MONO="module_mono_enabled=yes"
 export TERM=xterm
 
-rm -rf godot
-mkdir godot
-cd godot
-tar xf /root/godot.tar.gz --strip-components=1
+# Ensure workspace
+FOLDER_NAME="godot"
+if [[ "$DEBUG_MODE" -eq 1 && -d "$FOLDER_NAME" ]]; then
+    echo "The debug mode is enabled, using the already existing folder..."
+    cd $FOLDER_NAME
+else
+    rm -rf $FOLDER_NAME
+    mkdir $FOLDER_NAME
+    cd $FOLDER_NAME
+    tar xf /root/godot.tar.gz --strip-components=1
+fi
 
 # Setup
 case "$JS_ENGINE" in
@@ -22,6 +29,9 @@ case "$JS_ENGINE" in
   qjs) echo "Using QuickJS JS Engine!"; OPTIONS="${OPTIONS} use_quickjs=yes"; BUILD_NAME="${BUILD_NAME}-qjs";;
   *) echo "Invalid js engine. Available engines: v8, qjs_ng, qjs"; exit 1;;
 esac
+
+# GodotJS: compilation fix
+sed -i 's|../../|../|' -e modules/GodotJS/weaver-editor/jsb_editor_helper.cpp
 
 # Classical
 

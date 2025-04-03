@@ -3,6 +3,11 @@ set -e
 
 # Based on: https://github.com/godotengine/godot-build-scripts/blob/3348432f38773fcaaba0d90432832663fe65cc4d/build-windows/build.sh
 
+if [[ "$JS_ENGINE" == "v8" ]]; then
+  echo "ERR: v8 is not yet supported on mingw builds."
+  exit 1
+fi
+
 # Config
 
 export SCONS="scons -j${NUM_CORES} verbose=no warnings=no progress=no"
@@ -10,6 +15,18 @@ export OPTIONS="production=yes use_mingw=yes angle_libs=/root/angle mesa_libs=/r
 export OPTIONS_MONO="module_mono_enabled=yes"
 export OPTIONS_LLVM="use_llvm=yes mingw_prefix=/root/llvm-mingw"
 export TERM=xterm
+
+# Ensure workspace
+FOLDER_NAME="godot"
+if [[ "$DEBUG_MODE" -eq 1 && -d "$FOLDER_NAME" ]]; then
+    echo "The debug mode is enabled, using the already existing folder..."
+    cd $FOLDER_NAME
+else
+    rm -rf $FOLDER_NAME
+    mkdir $FOLDER_NAME
+    cd $FOLDER_NAME
+    tar xf /root/godot.tar.gz --strip-components=1
+fi
 
 # Setup
 case "$JS_ENGINE" in
@@ -19,23 +36,12 @@ case "$JS_ENGINE" in
   *) echo "Invalid js engine. Available engines: v8, qjs_ng, qjs"; exit 1;;
 esac
 
-rm -rf godot
-mkdir godot
-cd godot
-tar xf /root/godot.tar.gz --strip-components=1
+# GodotJS: compilation fix
+sed -i 's|../../|../|' -e modules/GodotJS/weaver-editor/jsb_editor_helper.cpp
 
 # GodotJS: fix for mingw
 sed -i -e 's/winmm.lib/-lwinmm/' -e 's/Dbghelp.lib/-ldbghelp/' modules/GodotJS/SCsub
-
-if [[ "$1" == "v8" ]]; then
-  # TODO: fix v8 on mingw
-  # sed -i -e 's/v8_monolith.lib/libv8_monolith.a/' modules/GodotJS/SCsub
-  echo "v8 builds are not yet supported on mingw!"
-  exit 1
-else
-  # TODO: fix lws on mingw
-  sed -i -E 's/lws_support = .+$/lws_support = None/' modules/GodotJS/SCsub
-fi
+sed -i -E 's/lws_support = .+$/lws_support = None/' modules/GodotJS/SCsub
 
 # Classical
 
