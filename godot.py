@@ -219,6 +219,7 @@ def build_godot():
 
             filter_func = lambda tarinfo: (None if ".git" in tarinfo.name.split(os.sep) else tarinfo)
 
+            # TODO: Try to speed up compression (gzipping takes a while)
             with tarfile.open(tar_path, "w:gz") as tar:
                 tar.add(godot_dir, arcname=name_template, filter=filter_func)
                 head_path = Path(temp_dir) / "HEAD"
