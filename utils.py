@@ -108,11 +108,8 @@ class Log:
 
 
 class CMDChecker:
-    commands_to_check: List[str] = ["bash", "git", "curl", "docker", "7z", "tar", "unzip", "gzip", "jq"]
-
     @staticmethod
-    def check(cmds: Optional[List[str]] = None):
-        cmds = cmds or CMDChecker.commands_to_check
+    def check(cmds: List[str]):
         missing = [cmd for cmd in set(cmds) if shutil.which(cmd) is None]
 
         if missing:
@@ -128,23 +125,34 @@ class CMDChecker:
 
 class Git:
     @staticmethod
-    def clone_repo_no_depth(repo_url: str, branch: str, target_dir: str | Path) -> None:
+    def clone_no_depth(repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
         CMDChecker.checkSingle("git")
-        cmd = shlex.split(f"git clone --recursive --depth 1 --branch {branch} {repo_url} {str(Path(target_dir))}")
+        cmd = ["git", "clone", "--recursive", "--depth", "1", repo_url, str(Path(target_dir))]
+        if git_ref:
+            cmd += ["--branch", git_ref]
         subprocess.run(cmd, check=True)
 
     @staticmethod
-    def clone_and_checkout(repo_url: str, dest_dir: str, git_ref: Optional[str] = None) -> None:
-        if not os.path.exists(dest_dir):
-            run_command_safe(["git", "clone", "--recursive", repo_url, dest_dir])
-        if git_ref and os.path.isdir(dest_dir):
-            run_command_safe(["git", "fetch", "origin"], cwd=dest_dir)
-            if not run_command_safe(["git", "reset", "--hard", f"origin/{git_ref}"], cwd=dest_dir):
-                run_command_safe(["git", "reset", "--hard", git_ref], cwd=dest_dir)
-            run_command_safe(["git", "clean", "-xdf"], cwd=dest_dir)
+    def clone_and_checkout(repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
+        CMDChecker.checkSingle("git")
+        if not os.path.exists(target_dir):
+            run_command_safe(["git", "clone", "--recursive", repo_url, target_dir])
+        if git_ref and os.path.isdir(target_dir):
+            run_command_safe(["git", "fetch", "origin"], cwd=target_dir)
+            if not run_command_safe(["git", "reset", "--hard", f"origin/{git_ref}"], cwd=target_dir):
+                run_command_safe(["git", "reset", "--hard", git_ref], cwd=target_dir)
+            run_command_safe(["git", "clean", "-xdf"], cwd=target_dir)
+
+    @staticmethod
+    def clone(no_depth: Optional[bool], repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
+        if no_depth:
+            Git.clone_no_depth(repo_url, target_dir, git_ref)
+        else:
+            Git.clone_and_checkout(repo_url, target_dir, git_ref)
 
     @staticmethod
     def get_commit_hash(repo_path: str | Path):
+        CMDChecker.checkSingle("git")
         try:
             return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_path, text=True).strip()
         except subprocess.CalledProcessError:
@@ -307,6 +315,7 @@ class FileExtractor:
 
     @staticmethod
     def extract_7z(file_path: Path, dest_dir: Path):
+        CMDChecker.checkSingle("7z")
         subprocess.run(["7z", "x", str(file_path), f"-o{dest_dir}"], capture_output=True, text=True, check=True)
 
     @staticmethod

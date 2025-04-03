@@ -26,7 +26,6 @@ keystore_file_name = "file.keystore"
 
 build_targets = ["mono-glue", "windows", "linux", "web", "macos", "android", "ios"]
 js_engines = ["v8", "qjs", "qjs_ng", "jsc"]
-build_types = ["all", "classical", "mono"]
 
 default_encryption_key = "0" * 64
 encryption_key = (
@@ -40,6 +39,8 @@ subparsers = parser.add_subparsers(title="subcommands", dest="command", required
 repos_parser = subparsers.add_parser("repos", help="clone base git repositories")
 repos_parser.add_argument("-c", "--containers-ref", help="build-containers git ref")
 repos_parser.add_argument("-s", "--scripts-ref", help="godot-build-scripts git branch/tag")
+repos_parser.add_argument("-w", "--which", choices=["containers", "scripts"], help="select which container to clone")
+repos_parser.add_argument("--no-depth", action="store_true", help="clone specific ref (branch/tag) with no depth")
 
 containers_parser = subparsers.add_parser("containers", help="build containers")
 containers_parser.add_argument("target", choices=Containers.build_targets, help="build target")
@@ -53,28 +54,39 @@ build_parser.add_argument("-v", "--godot-version", default="4.4.1-stable", help=
 build_parser.add_argument("-j", "--godotjs-ref", default="main", help="godotjs git ref")
 build_parser.add_argument("-d", "--deps-ref", default="v8_12.4.254.21_r13", help="godotjs dependencies release ref")
 build_parser.add_argument("-g", "--godot-ref", default="4.4.1-stable", help="godot engine git ref")
-build_parser.add_argument("-b", "--build-type", default=build_types[0], choices=build_types, help="build type")
+build_parser.add_argument("-b", "--build-type", choices=["classical", "mono"], help="build type (defaults to all)")
 build_parser.add_argument("-e", "--js-engine", default=js_engines[2], choices=js_engines, help="js engine")
 build_parser.add_argument("-c", "--skip-checkout", action="store_true", help="js engine")
+build_parser.add_argument("--no-depth", action="store_true", help="clone specific ref (branch/tag) with no depth")
 build_parser.add_argument("-z", "--debug", action="store_true", help="toggle debug mode")
 
 args = parser.parse_args()
 
 
 def clone_repositories():
-    if containers_dir.exists():
-        Log.warn(f"The 'build-containers' dir already exists ({containers_dir}). Skipping...")
-    else:
-        Log.info("Clonning build containers...")
-        Git.clone_and_checkout(
-            "https://github.com/godotengine/build-containers.git", containers_dir, args.containers_ref
-        )
+    if args.which in (None, "containers"):
+        if containers_dir.exists():
+            Log.warn(f"The 'build-containers' dir already exists ({containers_dir}). Skipping...")
+        else:
+            Log.info("Clonning build containers...")
+            Git.clone(
+                args.no_depth,
+                "https://github.com/godotengine/build-containers.git",
+                containers_dir,
+                args.containers_ref,
+            )
 
-    if scripts_dir.exists():
-        Log.warn(f"The 'godot-build-scripts' dir already exists ({scripts_dir}). Skipping...")
-    else:
-        Log.info("Clonning build scripts...")
-        Git.clone_and_checkout("https://github.com/godotengine/godot-build-scripts.git", scripts_dir, args.scripts_ref)
+    if args.which in (None, "scripts"):
+        if scripts_dir.exists():
+            Log.warn(f"The 'godot-build-scripts' dir already exists ({scripts_dir}). Skipping...")
+        else:
+            Log.info("Clonning build scripts...")
+            Git.clone(
+                args.no_depth,
+                "https://github.com/godotengine/godot-build-scripts.git",
+                scripts_dir,
+                args.scripts_ref,
+            )
 
 
 def build_container():
@@ -174,7 +186,7 @@ def build_godot():
         Log.warn("Godot Engine is already downloaded and you opted to skip checkouts, skipping...")
     else:
         Log.info("Downloading Godot Engine...")
-        Git.clone_and_checkout("https://github.com/godotengine/godot.git", godot_dir, args.godot_ref)
+        Git.clone(args.no_depth, "https://github.com/godotengine/godot.git", godot_dir, args.godot_ref)
 
     # ? Add validate version again?
 
@@ -183,7 +195,7 @@ def build_godot():
         Log.warn("GodotJS is already downloaded and you opted to skip checkouts, skipping...")
     else:
         Log.info("Downloading GodotJS...")
-        Git.clone_and_checkout("https://github.com/godotjs/godotjs.git", godotjs_dir, args.godotjs_ref)
+        Git.clone(args.no_depth, "https://github.com/godotjs/godotjs.git", godotjs_dir, args.godotjs_ref)
 
     # 5. Download GodotJS dependencies
     if args.skip_checkout and dep_v8_dir.exists():
@@ -248,8 +260,8 @@ def build_godot():
             "BUILD_NAME": config.build_name,
             "GODOT_VERSION_STATUS": g_status,
             "NUM_CORES": config.num_cores,
-            "CLASSICAL": "1" if args.build_type in ("all", "classical") else "0",
-            "MONO": "1" if args.build_type in ("all", "mono") else "0",
+            "CLASSICAL": "1" if args.build_type in (None, "classical") else "0",
+            "MONO": "1" if args.build_type in (None, "mono") else "0",
             "STEAM": "1" if config.build_steam else "0",
             "SCRIPT_AES256_ENCRYPTION_KEY": encryption_key,
             "JS_ENGINE": args.js_engine,
@@ -350,8 +362,8 @@ def build_godot():
     )
 
     Log.debug(f"Final command: {' '.join(docker_cmd).replace(encryption_key, '***')}")
+    CMDChecker.checkSingle(config.tool)
     subprocess.run(docker_cmd, cwd=scripts_dir, check=True)
-    Log.info("Build completed successfully!")
 
 
 # == Command Execution ==
