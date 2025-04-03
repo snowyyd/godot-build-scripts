@@ -35,6 +35,7 @@ encryption_key = (
 # == Argument Parser ==
 parser = argparse.ArgumentParser(description="Godot Build Script")
 subparsers = parser.add_subparsers(title="subcommands", dest="command", required=True, help="available commands")
+parser.add_argument("--ci", action="store_true", help="enable CI support")
 
 repos_parser = subparsers.add_parser("repos", help="clone base git repositories")
 repos_parser.add_argument("-c", "--containers-ref", help="build-containers git ref")
@@ -56,7 +57,7 @@ build_parser.add_argument("-d", "--deps-ref", default="v8_12.4.254.21_r13", help
 build_parser.add_argument("-g", "--godot-ref", default="4.4.1-stable", help="godot engine git ref")
 build_parser.add_argument("-b", "--build-type", choices=["classical", "mono"], help="build type (defaults to all)")
 build_parser.add_argument("-e", "--js-engine", default=js_engines[2], choices=js_engines, help="js engine")
-build_parser.add_argument("-c", "--skip-checkout", action="store_true", help="js engine")
+build_parser.add_argument("-f", "--force-checkout", action="store_true", help="force git checkout")
 build_parser.add_argument("--no-depth", action="store_true", help="clone specific ref (branch/tag) with no depth")
 build_parser.add_argument("-z", "--debug", action="store_true", help="toggle debug mode")
 
@@ -94,9 +95,6 @@ def build_container():
 
 
 def build_godot():
-    # Check system dependencies
-    CMDChecker.check()
-
     # Print config
     for k, v in vars(args).items():
         Log.kv(k, v)
@@ -182,8 +180,12 @@ def build_godot():
             shutil.copy(keystore_file_path, dep_keystore_path / keystore_file_name)
 
     # 3. Checkout Godot Engine
-    if args.skip_checkout and godot_dir.exists():
-        Log.warn("Godot Engine is already downloaded and you opted to skip checkouts, skipping...")
+    if godot_dir.exists():
+        if args.force_checkout:
+            Log.info("Deleting Godot Engine repo folder as you opted to force checkouts...")
+            shutil.rmtree(godot_dir)
+        else:
+            Log.warn("Skipping checkout of Godot Engine since it already exists...")
     else:
         Log.info("Downloading Godot Engine...")
         Git.clone(args.no_depth, "https://github.com/godotengine/godot.git", godot_dir, args.godot_ref)
@@ -191,15 +193,23 @@ def build_godot():
     # ? Add validate version again?
 
     # 4. Checkout GodotJS
-    if args.skip_checkout and godotjs_dir.exists():
-        Log.warn("GodotJS is already downloaded and you opted to skip checkouts, skipping...")
+    if godotjs_dir.exists():
+        if args.force_checkout:
+            Log.info("Deleting GodotJS repo folder as you opted to force checkouts...")
+            shutil.rmtree(godotjs_dir)
+        else:
+            Log.warn("Skipping checkout of GodotJS since it already exists...")
     else:
         Log.info("Downloading GodotJS...")
         Git.clone(args.no_depth, "https://github.com/godotjs/godotjs.git", godotjs_dir, args.godotjs_ref)
 
     # 5. Download GodotJS dependencies
-    if args.skip_checkout and dep_v8_dir.exists():
-        Log.warn("v8 is already downloaded and you opted to skip checkouts, skipping...")
+    if dep_v8_dir.exists():
+        if args.force_checkout:
+            Log.info("Deleting v8 folder as you opted to force checkouts...")
+            shutil.rmtree(dep_v8_dir)
+        else:
+            Log.warn("Skipping download of v8 since it already exists...")
     else:
         v8_file = godot_dir / "v8.zip"
         Log.info("Downloading v8...")

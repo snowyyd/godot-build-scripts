@@ -127,6 +127,9 @@ class Git:
     @staticmethod
     def clone_no_depth(repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
         CMDChecker.checkSingle("git")
+        if os.path.exists(target_dir):
+            raise RuntimeError("The target dir already exists")
+
         cmd = ["git", "clone", "--recursive", "--depth", "1", repo_url, str(Path(target_dir))]
         if git_ref:
             cmd += ["--branch", git_ref]
@@ -135,9 +138,11 @@ class Git:
     @staticmethod
     def clone_and_checkout(repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
         CMDChecker.checkSingle("git")
-        if not os.path.exists(target_dir):
-            run_command_safe(["git", "clone", "--recursive", repo_url, target_dir])
-        if git_ref and os.path.isdir(target_dir):
+        if os.path.exists(target_dir):
+            raise RuntimeError("The target dir already exists")
+
+        run_command_safe(["git", "clone", "--recursive", repo_url, target_dir])
+        if git_ref:
             run_command_safe(["git", "fetch", "origin"], cwd=target_dir)
             if not run_command_safe(["git", "reset", "--hard", f"origin/{git_ref}"], cwd=target_dir):
                 run_command_safe(["git", "reset", "--hard", git_ref], cwd=target_dir)
