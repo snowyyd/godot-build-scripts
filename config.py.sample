@@ -1,0 +1,5 @@
+tool = "docker"
+image_version = "latest"
+build_name = "custom_build"
+num_cores = 16
+build_steam = False

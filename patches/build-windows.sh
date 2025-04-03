@@ -12,11 +12,11 @@ export OPTIONS_LLVM="use_llvm=yes mingw_prefix=/root/llvm-mingw"
 export TERM=xterm
 
 # Setup
-case "$1" in
+case "$JS_ENGINE" in
   v8) echo "Using v8 JS Engine!"; BUILD_NAME="${BUILD_NAME}-v8";;
   qjs_ng) echo "Using QuickJS-NG JS Engine!"; OPTIONS="${OPTIONS} use_quickjs_ng=yes"; BUILD_NAME="${BUILD_NAME}-ng";;
   qjs) echo "Using QuickJS JS Engine!"; OPTIONS="${OPTIONS} use_quickjs=yes"; BUILD_NAME="${BUILD_NAME}-qjs";;
-  *) echo "Usage: $0 <js engine> (Available engines: v8, qjs_ng, qjs)"; exit 1;;
+  *) echo "Invalid js engine. Available engines: v8, qjs_ng, qjs"; exit 1;;
 esac
 
 rm -rf godot

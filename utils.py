@@ -8,10 +8,18 @@ import tarfile
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import TypedDict, Any, List, Dict, Tuple, Literal, Optional
 
 if __name__ == "__main__":
     raise Exception("This module cannot be run directly")
+
+
+def run_command_safe(command: list[str], cwd: str = ".") -> Optional[str]:
+    try:
+        result = subprocess.run(command, cwd=cwd, check=True, text=True)
+        return result.stdout
+    except subprocess.CalledProcessError:
+        return None
 
 
 class Colors:
@@ -91,6 +99,10 @@ class Log:
         print(Colors.color_text_bold("INFO:", Colors.GREEN), text)
 
     @staticmethod
+    def debug(text: str) -> None:
+        print(Colors.color_text_bold("DEBUG:", Colors.CYAN), text)
+
+    @staticmethod
     def kv(k: str, v: str) -> None:
         print(Colors.color_text(f"{k}:", Colors.GREEN), v)
 
@@ -116,10 +128,27 @@ class CMDChecker:
 
 class Git:
     @staticmethod
-    def clone_repo(repo_url: str, branch: str, target_dir: str | Path) -> None:
+    def clone_repo_no_depth(repo_url: str, branch: str, target_dir: str | Path) -> None:
         CMDChecker.checkSingle("git")
         cmd = shlex.split(f"git clone --recursive --depth 1 --branch {branch} {repo_url} {str(Path(target_dir))}")
         subprocess.run(cmd, check=True)
+
+    @staticmethod
+    def clone_and_checkout(repo_url: str, dest_dir: str, git_ref: Optional[str] = None) -> None:
+        if not os.path.exists(dest_dir):
+            run_command_safe(["git", "clone", "--recursive", repo_url, dest_dir])
+        if git_ref and os.path.isdir(dest_dir):
+            run_command_safe(["git", "fetch", "origin"], cwd=dest_dir)
+            if not run_command_safe(["git", "reset", "--hard", f"origin/{git_ref}"], cwd=dest_dir):
+                run_command_safe(["git", "reset", "--hard", git_ref], cwd=dest_dir)
+            run_command_safe(["git", "clean", "-xdf"], cwd=dest_dir)
+
+    @staticmethod
+    def get_commit_hash(repo_path: str | Path):
+        try:
+            return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_path, text=True).strip()
+        except subprocess.CalledProcessError:
+            return None
 
 
 class Containers:
@@ -264,6 +293,7 @@ def download_file(url: str, destination: str):
                         f"\r[{'#' * progress}{'.' * (50 - progress)}] {downloaded / 1024:.2f} KB ({percentage:.2f}%)"
                     )
                     sys.stdout.flush()
+            print()
 
 
 class FileExtractor:
@@ -302,14 +332,51 @@ class FileExtractor:
         raise ValueError(f"Unsupported file type: {file_path}")
 
 
+class DependencyConfig(TypedDict):
+    target: List[Literal["windows", "macos", "linux", "android", "ios"]]
+    base_url: str
+    files: Dict[str, str]  # {"archivo_remoto": "archivo_local"}
+    extract: Literal["extract_tar", "extract_zip", "extract_7z"]
+    move: List[Tuple[str, str]]  # [(origen, destino)]
+
+
 class Dependencies:
     @staticmethod
-    def download(url: str, dest: str | Path, filename: str) -> None:
+    def download(url: str, dest: str | Path, filename: str) -> bool:
         dest = Path(dest)
 
-        if dest.is_dir():
-            Log.warn(f"{dest} already exists, skipping download...")
-            return
+        # if dest.is_dir():
+        #     Log.warn(f"{dest} already exists, skipping download...")
+        #     return False
 
         os.makedirs(dest, exist_ok=True)
         download_file(url, dest / filename)
+        return True
+
+    @staticmethod
+    def ensure(dependency_name: str, dependency: DependencyConfig, current_target: str, base_path: Path):
+        full_path = base_path / dependency_name
+
+        if full_path.is_dir():
+            Log.warn(f"{full_path} already exists, skipping download...")
+            return
+
+        if "target" not in dependency or current_target in dependency["target"]:
+            Log.info(f"Ensuring dependency '{dependency_name}'...")
+            for remote_name, local_name in dependency["files"].items():
+                # Log.debug(f"Downloading {dependency['base_url']}/{remote_name} -> {full_path}/{local_name}")
+                ret = Dependencies.download(f"{dependency['base_url']}/{remote_name}", full_path, local_name)
+                if not ret:
+                    continue
+                # Log.debug(f"Extracting {full_path / local_name} -> {full_path}")
+                FileExtractor.extract_file(full_path / local_name, full_path)
+                # Log.debug(f"Unlinking {full_path / local_name}")
+                (full_path / local_name).unlink(True)
+
+                if "move" in dependency:
+                    for src, dst in dependency["move"]:
+                        src_path = full_path / src
+                        dst_path = full_path / dst
+                        if src_path.exists() and not dst_path.exists():
+                            # Log.debug(f"Renaming {src_path} -> {dst_path}")
+                            src_path.rename(dst_path)

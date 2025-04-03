@@ -1,3 +1,4 @@
 /tmp
 *.gdkey
 __pycache__
+config.py
