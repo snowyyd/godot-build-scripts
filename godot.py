@@ -20,7 +20,7 @@ scripts_deps_dir = scripts_dir / "deps"
 godot_dir = scripts_dir / "git"
 godotjs_dir = godot_dir / "modules" / "GodotJS"
 dep_v8_dir = godotjs_dir / "v8"
-logs_dir = scripts_dir / "out" / "logs"
+# logs_dir = scripts_dir / "out" / "logs"
 mono_glue_dir = scripts_dir / "mono-glue"
 keystore_file_name = "file.keystore"
 
@@ -105,7 +105,7 @@ def build_godot():
     Patcher.copy_files("patch", patches_dir, scripts_dir)
 
     # 1. Ensure dirs
-    os.makedirs(logs_dir, exist_ok=True)
+    # os.makedirs(logs_dir, exist_ok=True)
     os.makedirs(mono_glue_dir, exist_ok=True)
 
     # ? add "logs/build"
