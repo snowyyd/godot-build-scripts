@@ -3,3 +3,40 @@ image_version = "latest"
 build_name = "custom_build"
 num_cores = 16
 build_steam = False
+
+# PCK encryption key
+# Reference: https://docs.godotengine.org/en/stable/contributing/development/compiling/compiling_with_script_encryption_key.html
+# This setting can also be read from environment variables if set to "None"
+encryption_key = None
+
+# == Android related config ==
+
+# Maven Central (Sonatype) credentials
+ossrh = {
+    "group_id": "",
+    "username": "",
+    "password": "",
+}
+
+# Sonatype assigned ID used to upload the generated artifacts
+sonatype_staging_profile_id = ""
+
+# Used to sign the artifacts after they're built
+signing = {
+    # ID of the GPG key pair, the last eight characters of its fingerprint
+    "key_id": "",
+    # Passphrase of the key pair
+    "password": "",
+    # base64 encoded private GPG key
+    "key": "",
+}
+
+# Android signing configs
+keystore = {
+    # Path to the Android keystore file used to sign the release build
+    "path": "",
+    # Key alias used for signing the release build
+    "alias": "",
+    # Password for the key used for signing the release build
+    "password": "",
+}

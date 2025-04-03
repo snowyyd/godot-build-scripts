@@ -357,7 +357,7 @@ class Dependencies:
     def ensure(dependency_name: str, dependency: DependencyConfig, current_target: str, base_path: Path):
         full_path = base_path / dependency_name
 
-        if full_path.is_dir():
+        if full_path.exists():
             Log.warn(f"{full_path} already exists, skipping download...")
             return
 

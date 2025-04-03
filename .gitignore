@@ -1,4 +1,7 @@
-/tmp
+# sensitive info
 *.gdkey
-__pycache__
 config.py
+
+# temporal files
+/tmp
+__pycache__

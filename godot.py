@@ -2,10 +2,14 @@
 
 import argparse
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from utils import *
+
+# == Load configs ==
+config = Config("config.py")
 
 # == Variables ==
 work_dir = Path(__file__).resolve().parent
@@ -18,11 +22,16 @@ godotjs_dir = godot_dir / "modules" / "GodotJS"
 dep_v8_dir = godotjs_dir / "v8"
 logs_dir = scripts_dir / "out" / "logs"
 mono_glue_dir = scripts_dir / "mono-glue"
+keystore_file_name = "file.keystore"
 
 build_targets = ["mono-glue", "windows", "linux", "web", "macos", "android", "ios"]
 js_engines = ["v8", "qjs", "qjs_ng", "jsc"]
 build_types = ["all", "classical", "mono"]
-encryption_key = os.getenv("SCRIPT_AES256_ENCRYPTION_KEY", "0" * 64)
+
+default_encryption_key = "0" * 64
+encryption_key = (
+    config.encryption_key if config.encryption_key else os.getenv("SCRIPT_AES256_ENCRYPTION_KEY", "0" * 64)
+)
 
 # == Argument Parser ==
 parser = argparse.ArgumentParser(description="Godot Build Script")
@@ -79,7 +88,7 @@ def build_godot():
     # Print config
     for k, v in vars(args).items():
         Log.kv(k, v)
-    Log.kv("aes_encryption", "enabled" if os.getenv("SCRIPT_AES256_ENCRYPTION_KEY") else "disabled")
+    Log.kv("aes_encryption", "enabled" if encryption_key != default_encryption_key else "disabled")
 
     # Apply patches
     Log.info("Patching required files...")
@@ -90,9 +99,6 @@ def build_godot():
     os.makedirs(mono_glue_dir, exist_ok=True)
 
     # ? add "logs/build"
-
-    # 2. Load configs & config vars
-    config = Config("config.py")
 
     # Split godot_version
     g_version, _, g_status = args.godot_version.partition("-")
@@ -151,8 +157,17 @@ def build_godot():
         Dependencies.ensure(name, opts, args.target, scripts_deps_dir)
 
     if args.target == "android":
-        # TODO: add keystore
-        Log.warn("Keystore is not yet implemented")
+        dep_keystore_path = scripts_deps_dir / "keystore"
+        os.makedirs(dep_keystore_path, exist_ok=True)
+        keystore_file_path = Path(config.keystore["path"]) if config.keystore["path"] != "" else None
+        if not keystore_file_path:
+            Log.warn("Android keystore path is not defined, the build will not be signed!")
+        elif not keystore_file_path.is_file():
+            Log.err("The keystore path you configured does not exists or is not a file, exiting...")
+            raise SystemExit(1)
+        else:
+            Log.info(f"Copying keystore file located at {keystore_file_path}...")
+            shutil.copy(keystore_file_path, dep_keystore_path / keystore_file_name)
 
     # 3. Checkout Godot Engine
     if args.skip_checkout and godot_dir.exists():
@@ -214,10 +229,10 @@ def build_godot():
             Log.info(f"File is available on {final_tar_path}")
 
     # 7. Start container
-    def gen_args(envs: Optional[Dict[str, str]] = None, volumes: Optional[Dict[str, str]] = None) -> List[str]:
+    def gen_args(env: Optional[Dict[str, str]] = None, volumes: Optional[Dict[str, str]] = None) -> List[str]:
         args = []
-        if envs:
-            args.extend(["--env", f"{key}={value}"] for key, value in envs.items())
+        if env:
+            args.extend(["--env", f"{key}={value}"] for key, value in env.items())
         if volumes:
             args.extend(["-v", f"{local}:{container}"] for local, container in volumes.items())
         return [arg for sublist in args for arg in sublist]
@@ -291,6 +306,18 @@ def build_godot():
                 f"{scripts_dir}/deps/swappy": "/root/swappy",
                 f"{scripts_dir}/deps/keystore": "/root/keystore",
             },
+            "env": {
+                "OSSRH_GROUP_ID": config.ossrh["group_id"],
+                "OSSRH_USERNAME": config.ossrh["username"],
+                "OSSRH_PASSWORD": config.ossrh["password"],
+                "SONATYPE_STAGING_PROFILE_ID": config.sonatype_staging_profile_id,
+                "SIGNING_KEY_ID": config.signing["key_id"],
+                "SIGNING_PASSWORD": config.signing["password"],
+                "SIGNING_KEY": config.signing["key"],
+                "GODOT_ANDROID_SIGN_KEYSTORE": f"/root/keystore/{keystore_file_name}",
+                "GODOT_ANDROID_KEYSTORE_ALIAS": config.keystore["alias"],
+                "GODOT_ANDROID_SIGN_PASSWORD": config.keystore["password"],
+            },
         },
         "ios": {
             "image": "godot-ios",
@@ -309,7 +336,7 @@ def build_godot():
     if args.target in platforms:
         config_data = platforms[args.target]
         cmd_image = config_data["image"]
-        cmd_suffix = gen_args(None, config_data["volumes"])
+        cmd_suffix = gen_args(config_data["env"] if "env" in config_data else None, config_data["volumes"])
     else:
         raise ValueError(f"Unknown target: {args.target}")
 
@@ -319,7 +346,7 @@ def build_godot():
     )
 
     Log.debug(f"Final command: {' '.join(docker_cmd).replace(encryption_key, '***')}")
-    # subprocess.run(docker_cmd, cwd=scripts_dir, check=True)
+    subprocess.run(docker_cmd, cwd=scripts_dir, check=True)
     Log.info("Build completed successfully!")
 
 
