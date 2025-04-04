@@ -25,7 +25,6 @@ mono_glue_dir = scripts_dir / "mono-glue"
 keystore_file_name = "file.keystore"
 
 build_targets = ["mono-glue", "windows", "linux", "web", "macos", "android", "ios"]
-js_engines = ["v8", "qjs", "qjs_ng", "jsc"]
 
 default_encryption_key = "0" * 64
 encryption_key = (
@@ -55,10 +54,15 @@ build_parser.add_argument("-j", "--godotjs-ref", default="main", help="godotjs g
 build_parser.add_argument("-d", "--deps-ref", default="v8_12.4.254.21_r13", help="godotjs dependencies release ref")
 build_parser.add_argument("-g", "--godot-ref", default="4.4.1-stable", help="godot engine git ref")
 build_parser.add_argument("-b", "--build-type", choices=["classical", "mono"], help="build type (defaults to all)")
-build_parser.add_argument("-e", "--js-engine", default=js_engines[2], choices=js_engines, help="js engine")
+build_parser.add_argument(
+    "-e",
+    "--js-engine",
+    choices=["v8", "qjs", "qjs_ng", "jsc"],
+    help="js engine (GodotJS will not be added if not set)",
+)
 build_parser.add_argument("-f", "--force-checkout", action="store_true", help="force git checkout")
 build_parser.add_argument("--no-depth", action="store_true", help="clone specific ref (branch/tag) with no depth")
-build_parser.add_argument("-z", "--debug", action="store_true", help="toggle debug mode")
+build_parser.add_argument("-z", "--debug", action="store_true", help="enable debug mode")
 
 args = parser.parse_args()
 
@@ -192,36 +196,39 @@ def build_godot():
     # ? Add validate version again?
 
     # 4. Checkout GodotJS
-    if godotjs_dir.exists():
-        if args.force_checkout:
-            Log.info("Deleting GodotJS repo folder as you opted to force checkouts...")
-            shutil.rmtree(godotjs_dir)
-        else:
-            Log.warn("Skipping checkout of GodotJS since it already exists...")
+    if not args.js_engine:
+        Log.warn("JavaScript engine is not set, GodotJS will be skipped...")
     else:
-        Log.info("Downloading GodotJS...")
-        Git.clone(args.no_depth, "https://github.com/godotjs/godotjs.git", godotjs_dir, args.godotjs_ref)
-
-    # 5. Download GodotJS dependencies
-    if dep_v8_dir.exists():
-        if args.force_checkout:
-            Log.info("Deleting v8 folder as you opted to force checkouts...")
-            shutil.rmtree(dep_v8_dir)
+        if godotjs_dir.exists():
+            if args.force_checkout:
+                Log.info("Deleting GodotJS repo folder as you opted to force checkouts...")
+                shutil.rmtree(godotjs_dir)
+            else:
+                Log.warn("Skipping checkout of GodotJS since it already exists...")
         else:
-            Log.warn("Skipping download of v8 since it already exists...")
-    else:
-        v8_file = godot_dir / "v8.zip"
-        Log.info("Downloading v8...")
-        download_file(
-            f"https://github.com/ialex32x/GodotJS-Dependencies/releases/download/{args.deps_ref}/{args.deps_ref}.zip",
-            v8_file,  # ? Use tmpdir?
-        )
+            Log.info("Downloading GodotJS...")
+            Git.clone(args.no_depth, "https://github.com/godotjs/godotjs.git", godotjs_dir, args.godotjs_ref)
 
-        Log.info("Extracting v8...")
-        FileExtractor.extract_file(
-            v8_file, godotjs_dir
-        )  # godotjs_dir instead of dep_v8_dir since v8.zip has its own folder called v8
-        v8_file.unlink(True)
+        # 5. Download GodotJS dependencies
+        if dep_v8_dir.exists():
+            if args.force_checkout:
+                Log.info("Deleting v8 folder as you opted to force checkouts...")
+                shutil.rmtree(dep_v8_dir)
+            else:
+                Log.warn("Skipping download of v8 since it already exists...")
+        else:
+            v8_file = godot_dir / "v8.zip"
+            Log.info("Downloading v8...")
+            download_file(
+                f"https://github.com/ialex32x/GodotJS-Dependencies/releases/download/{args.deps_ref}/{args.deps_ref}.zip",
+                v8_file,  # ? Use tmpdir?
+            )
+
+            Log.info("Extracting v8...")
+            FileExtractor.extract_file(
+                v8_file, godotjs_dir
+            )  # godotjs_dir instead of dep_v8_dir since v8.zip has its own folder called v8
+            v8_file.unlink(True)
 
     # 6. Create gzipped tarball
     name_template = f"godot-{args.godot_version}"

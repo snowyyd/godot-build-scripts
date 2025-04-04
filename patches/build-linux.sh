@@ -24,14 +24,17 @@ fi
 
 # Setup
 case "$JS_ENGINE" in
+  None) echo "JS_ENGINE is not set, GodotJS will not be compiled";;
   v8) echo "Using v8 JS Engine!"; BUILD_NAME="${BUILD_NAME}-v8";;
   qjs_ng) echo "Using QuickJS-NG JS Engine!"; OPTIONS="${OPTIONS} use_quickjs_ng=yes"; BUILD_NAME="${BUILD_NAME}-ng";;
   qjs) echo "Using QuickJS JS Engine!"; OPTIONS="${OPTIONS} use_quickjs=yes"; BUILD_NAME="${BUILD_NAME}-qjs";;
   *) echo "Invalid js engine. Available engines: v8, qjs_ng, qjs"; exit 1;;
 esac
 
-# GodotJS: compilation fix
-sed -i 's|../../|../|' -e modules/GodotJS/weaver-editor/jsb_editor_helper.cpp
+if [[ "$JS_ENGINE" != "None" ]]; then
+  # GodotJS: compilation fix
+  sed -i 's|../../|../|' -e modules/GodotJS/weaver-editor/jsb_editor_helper.cpp
+fi
 
 # Classical
 
