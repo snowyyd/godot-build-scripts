@@ -1,6 +1,5 @@
 import importlib.util
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -129,7 +128,7 @@ class Git:
         CMDChecker.checkSingle("git")
         if not os.path.exists(target_dir):
             raise RuntimeError("The target dir does not exist")
-        run_command_safe(["git", "clean", "-xdf"], cwd=target_dir)
+        run_command_safe(["git", "clean", "-xdff"], cwd=target_dir)
 
     @staticmethod
     def clone_no_depth(repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
@@ -153,7 +152,7 @@ class Git:
             run_command_safe(["git", "fetch", "origin"], cwd=target_dir)
             if not run_command_safe(["git", "reset", "--hard", f"origin/{git_ref}"], cwd=target_dir):
                 run_command_safe(["git", "reset", "--hard", git_ref], cwd=target_dir)
-            run_command_safe(["git", "clean", "-xdf"], cwd=target_dir)
+            run_command_safe(["git", "clean", "-xdff"], cwd=target_dir)
 
     @staticmethod
     def clone(no_depth: Optional[bool], repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
