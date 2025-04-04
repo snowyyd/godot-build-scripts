@@ -62,6 +62,7 @@ build_parser.add_argument(
 )
 build_parser.add_argument("-f", "--force-checkout", action="store_true", help="force git checkout")
 build_parser.add_argument("--no-depth", action="store_true", help="clone specific ref (branch/tag) with no depth")
+build_parser.add_argument("--clean", action="store_true", help="clean the workspace")
 build_parser.add_argument("-z", "--debug", action="store_true", help="enable debug mode")
 
 args = parser.parse_args()
@@ -102,6 +103,10 @@ def build_godot():
     for k, v in vars(args).items():
         Log.kv(k, v)
     Log.kv("aes_encryption", "enabled" if encryption_key != default_encryption_key else "disabled")
+
+    if args.clean:
+        Log.warn("Cleaning the workspace....")
+        Git.clean(scripts_dir)
 
     # Apply patches
     Log.info("Patching required files...")

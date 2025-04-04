@@ -125,6 +125,13 @@ class CMDChecker:
 
 class Git:
     @staticmethod
+    def clean(target_dir: str | Path):
+        CMDChecker.checkSingle("git")
+        if not os.path.exists(target_dir):
+            raise RuntimeError("The target dir does not exist")
+        run_command_safe(["git", "clean", "-xdf"], cwd=target_dir)
+
+    @staticmethod
     def clone_no_depth(repo_url: str, target_dir: str | Path, git_ref: Optional[str] = None) -> None:
         CMDChecker.checkSingle("git")
         if os.path.exists(target_dir):
@@ -196,20 +203,15 @@ class Patcher:
     ]
 
     @staticmethod
-    def backup_and_patch(patch_file: str | Path, dest_file: str | Path):
-        patch_file = Path(patch_file)
-        dest_file = Path(dest_file)
-
-        if not dest_file.exists():
-            raise FileNotFoundError(f"Destination file {dest_file} does not exist.")
-
-        backup_path = dest_file.with_suffix(dest_file.suffix + ".bak")
+    def make_backup(file_path: str | Path):
+        file_path = Path(file_path)
+        backup_path = file_path.with_suffix(file_path.suffix + ".bak")
 
         if not backup_path.exists():
-            shutil.copy(dest_file, backup_path)
-
-        Log.info(f"Patching {dest_file}...")
-        shutil.copy(patch_file, dest_file)
+            Log.info(f"Creating backup of {file_path}...")
+            shutil.copy(file_path, backup_path)
+        else:
+            Log.warn(f"Backup already exists for {file_path}, skipping...")
 
     @staticmethod
     def restore_backup(file_path: str | Path):
@@ -223,6 +225,17 @@ class Patcher:
             Log.warn(f"No backup found for {file_path}, skipping...")
 
     @staticmethod
+    def patch(patch_file: str | Path, dest_file: str | Path, backup: bool = False):
+        patch_file = Path(patch_file)
+        dest_file = Path(dest_file)
+
+        if not dest_file.exists():
+            raise FileNotFoundError(f"Destination file {dest_file} does not exist.")
+
+        Log.info(f"Patching {dest_file}...")
+        shutil.copy(patch_file, dest_file)
+
+    @staticmethod
     def copy_files(action: str, patches_dir: str | Path, scripts_dir: str | Path):
         patches_path = Path(patches_dir).resolve()
         scripts_path = Path(scripts_dir).resolve()
@@ -233,16 +246,15 @@ class Patcher:
             raise ValueError("The scripts_dir must be an absolute path.")
 
         actions = {
-            "patch": lambda: [
-                Patcher.backup_and_patch(patches_path / src, scripts_path / dst) for src, dst in Patcher.files
-            ],
+            "patch": lambda: [Patcher.patch(patches_path / src, scripts_path / dst) for src, dst in Patcher.files],
+            "backup": lambda: [Patcher.make_backup(scripts_path / dst) for _, dst in Patcher.files],
             "restore": lambda: [Patcher.restore_backup(scripts_path / dst) for _, dst in Patcher.files],
         }
 
         try:
             actions[action]()
         except KeyError:
-            raise ValueError("Invalid action. Use 'patch' or 'restore'.")
+            raise ValueError("Invalid action. Use 'patch', 'backup' or 'restore'.")
 
 
 class Config:
